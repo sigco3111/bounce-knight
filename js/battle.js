@@ -179,8 +179,14 @@ export async function startBattle(ctx) {
     S.gold += bonus;
     const healed = S.heroHP < ctx.heroMaxHP();
     if (healed) S.heroHP++;
-    if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
+    if (!ctx.norender) {
+      popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
+      burst(S.heroX, S.heroZ, 0xffd76a, 18, 4.2, 0.5, { vy0: 3.5, vyR: 3, ttl0: 0.7, ttlR: 0.3, sc: 1.1 }); // gold fountain at the hero
+      burst(S.heroX, S.heroZ, 0xfff6dd, 6, 2, 0.5, { vy0: 2.5, ttl0: 0.4, sc: 0.7 });
+      ring(S.heroX, S.heroZ, 0xffd76a, 1.8, 0.55);
+    }
     blip(880, 0.15, 'sine', 0.06);
+    setTimeout(() => blip(1174, 0.18, 'sine', 0.05), 120); // two-tone clear chime
     updHud();
   }
   function ring(x, z, color, maxR = 1.1, ttl = 0.4) { // local impact ring at the hit point
@@ -204,8 +210,8 @@ export async function startBattle(ctx) {
       burst(e.x, e.z, 0x9fd8ff, ev ? 13 : 9, ev ? 3.2 : 2.4, y, { vy0: 0.5, vyR: 0.9, ttl0: 0.75, ttlR: 0.3, sc: ev ? 1.3 : 1 });
       burst(e.x, e.z, 0xffffff, 4, 1.4, y, { vy0: 0.7, vyR: 0.5, ttl0: 0.4, ttlR: 0.15, sc: 0.65 });
     } else if (def.type === 'bolt') { // 빠르고 짧은 전기 스냅 + 백색 섬광
-      burst(e.x, e.z, 0xffe14d, ev ? 12 : 8, ev ? 7 : 5.5, y, { vy0: 1.2, vyR: 1.6, ttl0: 0.28, ttlR: 0.12, sc: ev ? 1.2 : 0.9 });
-      burst(e.x, e.z, 0xffffff, 3, 3.2, y, { vy0: 0.8, vyR: 0.6, ttl0: 0.18, ttlR: 0.08, sc: 0.55 });
+      burst(e.x, e.z, 0xffd400, ev ? 14 : 10, ev ? 7 : 5.5, y, { vy0: 1.2, vyR: 1.6, ttl0: 0.3, ttlR: 0.12, sc: ev ? 1.3 : 1.0 });
+      burst(e.x, e.z, 0xffffff, 2, 3.2, y, { vy0: 0.8, vyR: 0.6, ttl0: 0.18, ttlR: 0.08, sc: 0.55 });
     } else { // iron: 묵직한 금속 파편
       burst(e.x, e.z, 0xdde7f2, ev ? 14 : 9, ev ? 4.8 : 3.6, y, { vy0: 2, vyR: 2.5, ttl0: 0.45, ttlR: 0.15, sc: ev ? 1.4 : 1 });
     }
@@ -294,7 +300,8 @@ export async function startBattle(ctx) {
     for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(0xffffff); mt.emissiveIntensity = 0.9; } }
     if (src.def.evolved) { S.evolvedHits++; S.lastEvolvedDmg = dmg; }
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + dmg); }
-    blip(220 + Math.random() * 60, 0.04, 'square', 0.025);
+    const th = { fire: [170, 'square', 0.05], ice: [560, 'sine', 0.05], bolt: [980, 'sawtooth', 0.03], iron: [220, 'square', 0.04] }[src.def.type] || [220, 'square', 0.04];
+    blip(th[0] + Math.random() * 50, th[2], th[1], 0.025); // per-type hit timbre
     typeHitBurst(src.def, e);
     if (src.def.type === 'fire') {
       const rad = src.def.evolved ? 1.4 : 0.95, sd = Math.max(1, Math.ceil(dmg / 2));
