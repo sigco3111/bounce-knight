@@ -196,3 +196,26 @@ for (const failReads of [false, true]) {
   assert.equal(f.qa.persist(), false);
 }
 console.log('PASS: isolated save flows preserve corrupt/current/legacy originals, never auto-import, require explicit import/ignore, and avoid blocked-storage writes.');
+
+// Exercise removal/expiry with fake objects, never a real GPU or browser profile.
+{
+let stopped=0,uncached=0,disposed=0;const removed=[],labels=[];
+const box=vm.createContext({scene:{remove(o){removed.push(o)}},labels:{remove(o){labels.push(o)}}});
+vm.runInContext(between(battle, '  function rmvEnemy(e) {', '  function killEnemy(')+'\nglobalThis.removeEnemy=rmvEnemy;',box);
+const obj={geometry:{dispose(){throw Error('shared geometry disposed')}}},ice={};
+const enemy={obj,iceBox:ice,label:{},mats:Array.from({length:3},()=>({dispose(){disposed++}})),mixer:{stopAllAction(){stopped++},uncacheRoot(root){assert.equal(root,obj);uncached++}}};
+box.removeEnemy(enemy);assert.equal(stopped,1);assert.equal(uncached,1);assert.equal(disposed,3);assert.deepEqual(removed,[obj,ice]);assert.deepEqual(labels,[enemy.label]);assert.equal(enemy.mixer,null);assert.equal(enemy.iceBox,null);assert.equal(enemy.mats.length,0);
+box.removeEnemy(enemy);assert.equal(stopped,1);assert.equal(disposed,3);
+console.log('PASS exact rmvEnemy: mixer stopped/uncached, personal materials disposed once, ice/labels removed, shared geometry untouched.');
+let deaths=0,fxCalls=0;const purged=[];
+function mesh(){return {position:{x:0,y:1,z:0},rotation:{x:0,y:0},scale:{setScalar(k){assert.ok(Number.isFinite(k));this.value=k}},material:{opacity:1,dispose(){deaths++}},geometry:{dispose(){throw Error('shared FX geometry disposed')}}}}
+function part(t,ttl){return {mesh:mesh(),t,ttl,vx:1,vy:2,vz:3}}
+function ring(t,ttl){return {mesh:mesh(),t,ttl,maxR:2}}
+const livePart=part(0,0.25),liveRing=ring(0,0.25);
+const S={parts:[...Array.from({length:500},()=>part(.2,.25)),livePart],rings:[...Array.from({length:500},()=>ring(.2,.25)),liveRing],fxQueue:[{remaining:.05,run(){fxCalls++}},{remaining:.25,run(){fxCalls++}}]};
+const parts=S.parts,rings=S.rings;const fxBox=vm.createContext({S,dt:.1,scene:{remove(m){purged.push(m)}}});
+const tick='{'+between(battle, '    const dueFx = [];', '    // balls')+'}';vm.runInContext(tick,fxBox);assert.equal(fxCalls,1);assert.equal(S.fxQueue.length,1);assert.equal(deaths,1000);assert.equal(purged.length,1000);assert.equal(S.parts,parts);assert.equal(S.rings,rings);assert.equal(S.parts.length,1);assert.equal(S.parts[0],livePart);assert.equal(S.rings[0],liveRing);
+vm.runInContext(tick,fxBox);assert.equal(deaths,1000);assert.equal(fxCalls,1);vm.runInContext(tick,fxBox);assert.equal(deaths,1002);assert.equal(fxCalls,2);assert.equal(S.parts.length,0);assert.equal(S.rings.length,0);assert.equal(S.fxQueue.length,0);
+vm.runInContext(tick,fxBox);assert.equal(deaths,1002);assert.equal(fxCalls,2);
+console.log('PASS exact FX tick: 1000 simultaneous expirations, stable live entries, one disposal each, shared geometry untouched, delayed effects once. Not a GPU-memory benchmark.');
+}
