@@ -134,14 +134,14 @@
   #region-options button:disabled { opacity:.48;cursor:default; }
   #ov-prep { z-index:21;background:#080e1cf7;justify-content:flex-start;overflow:auto;padding:18px;box-sizing:border-box; }
   .prep-body { width:100%;max-width:720px;text-align:center; }
-  #ov-prep .cards { width:100%; } #ov-prep .card-pick { padding:10px; }
+  #ov-prep .cards { width:100%;max-width:none; } #ov-prep .card-pick { padding:10px; }
   #ov-prep h3 { font-size:14px;color:#ebcc97;margin:14px 0 7px; }
   #ov-prep button[aria-pressed=true] { outline:1px solid #e7ab59; }
   #codex-list { white-space:pre-line;text-align:left;font-size:11px;line-height:1.8;color:#afbfda;margin:8px 0 18px; }
-  @media (min-width:600px) { #route-cards,#contract-cards { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (min-width:600px) { #ov-prep #route-cards,#ov-prep #contract-cards { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } }
   #btn-route { margin-top:5px;min-height:28px;width:100%;background:#263348;color:#e4d9b5;border:1px solid #526383;border-radius:7px;font:700 11px sans-serif;cursor:pointer; }
   #region-detail { margin-top:5px;font-size:10px;line-height:14px;color:#acbddb; }
-  @media (min-aspect-ratio:6/5) { #region-select { left:56%;top:60px; } #screen-base .base-card { top:178px; } }
+  @media (min-aspect-ratio:6/5) { #region-select { left:56%;top:60px; } #screen-base .base-card { top:166px;padding:8px 12px; } #screen-base .base-card .row { margin-top:6px; } }
   /* ---- base screen ---- */
   .res-bar { position:absolute; top:12px; left:12px; right:12px; height:46px; background:rgba(16,21,36,.95);
     border-radius:14px; box-shadow:0 3px 0 rgba(0,0,0,.5); display:flex; align-items:center; padding:0 14px; gap:14px; z-index:6; }
@@ -168,6 +168,7 @@
     .base-card .btn { padding:10px 9px; font-size:13px; white-space:nowrap; flex-shrink:0; }
     .base-card .cost { white-space:nowrap; flex-shrink:0; }
     .go-wrap, .base-hint { left:56%; }
+    .base-hint { bottom:69px;line-height:15px !important; }
   }
   @media (prefers-reduced-motion:reduce) {
     #danger-line, #bt-loading { animation:none; opacity:1; }
