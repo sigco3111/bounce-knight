@@ -1,4 +1,4 @@
-import { REGIONS, regionOpen, KNIGHTS, knightOpen, selectedKnight } from './content.js';
+import { REGIONS, regionOpen, KNIGHTS, knightOpen, selectedKnight, ROUTES, selectedRoute, RELICS, CONTRACTS, selectedContract } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, nextExpeditionPlan } from './common.js';
 
@@ -62,6 +62,38 @@ export async function startBase(ctx) {
     e.preventDefault(); buttons[(i + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
   });
   updateKnightButton();
+
+  const routeButton = document.getElementById('btn-route'), prep = document.getElementById('ov-prep');
+  function updateRoute() { routeButton.textContent = '원정 준비 · ' + selectedRoute(ctx.save).name + ' · ' + selectedContract(ctx.save).name; }
+  function renderPrep() {
+    const routeCards = document.getElementById('route-cards'), contractCards = document.getElementById('contract-cards');
+    routeCards.innerHTML = ''; contractCards.innerHTML = '';
+    for (const r of ROUTES) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'card-pick'; b.dataset.route = r.id;
+      b.setAttribute('aria-pressed', String(selectedRoute(ctx.save).id === r.id));
+      b.innerHTML = `<div><div class="t1">${r.name}</div><div class="t2">${r.desc}</div></div>`;
+      b.onclick = () => { ctx.save.selectedRoute = r.id; ctx.persist(); updateRoute(); renderPrep(); prep.querySelector(`[data-route=${r.id}]`)?.focus(); }; routeCards.appendChild(b);
+    }
+    for (const c of CONTRACTS) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'card-pick'; b.dataset.contract = c.id;
+      b.setAttribute('aria-pressed', String(selectedContract(ctx.save).id === c.id));
+      b.innerHTML = `<div><div class="t1">${c.name}</div><div class="t2">${c.desc}</div></div>`;
+      b.onclick = () => { ctx.save.selectedContract = c.id; ctx.persist(); updateRoute(); renderPrep(); prep.querySelector(`[data-contract=${c.id}]`)?.focus(); }; contractCards.appendChild(b);
+    }
+    const found = ctx.save.discoveredRelics || [];
+    document.getElementById('codex-title').textContent = `유물 도감 ${found.length}/${RELICS.length}`;
+    document.getElementById('codex-list').textContent = RELICS.map(r => found.includes(r.id) ? r.name + ': ' + r.desc : '미발견 유물').join('\n');
+  }
+  routeButton.onclick = () => { renderPrep(); prep.classList.remove('hidden'); prep.querySelector('button')?.focus(); };
+  function closePrep() { prep.classList.add('hidden'); routeButton.focus(); }
+  document.getElementById('btn-prep-close').onclick = closePrep;
+  prep.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); closePrep(); }
+    if (e.key !== 'Tab') return;
+    const buttons = [...prep.querySelectorAll('button')], i = buttons.indexOf(document.activeElement);
+    e.preventDefault(); buttons[(i + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
+  });
+  updateRoute();
 
   const CW = () => W() / H() > 1.2 ? Math.round(W() * 0.56) : W();
   let reflowLabels = () => {};
@@ -172,7 +204,7 @@ export async function startBase(ctx) {
       const p = proj(labelAnchors[key]);
       const w = it.el.offsetWidth, h = it.el.offsetHeight;
       const x = Math.max(w / 2 + 8, Math.min(CW() - w / 2 - 8, p.x));
-      let y = Math.max(104, p.y);
+      let y = Math.max(208, p.y);
       while (placed.some(q => Math.abs(q.x - x) < (q.w + w) / 2 + 4 && y < q.y + q.h + 3 && y + h + 3 > q.y)) y += h + 4;
       placed.push({ x, y, w, h }); labels.place(it, x, y);
     }
