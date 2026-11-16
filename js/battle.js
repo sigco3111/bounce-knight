@@ -1,4 +1,4 @@
-import { REGIONS } from './content.js';
+import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
@@ -215,7 +215,7 @@ export async function startBattle(ctx) {
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
-    combo: 0, comboT: -99, reactions: 0, region: region.id, victory: false, hazardTimer: 8, hazard: null,
+    combo: 0, comboT: -99, reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -271,7 +271,7 @@ export async function startBattle(ctx) {
       const crown = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.07, 6, 8), new THREE.MeshStandardMaterial({ color: 0xffd479, emissive: 0xd7842b, emissiveIntensity: 0.6 }));
       crown.material.userData._e = 0xd7842b; crown.material.userData._ei = 0.6; mats.push(crown.material); crown.userData.personalGeometry = true; crown.rotation.x = Math.PI / 2; crown.position.y = m.h / def.s + 0.05; m.obj.add(crown);
     }
-    const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2));
+    const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2) * S.riskMul);
     const e = { originX: x, id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
     if (S.over) { rmvEnemy(e); return null; }
@@ -663,6 +663,41 @@ export async function startBattle(ctx) {
     setTimeout(() => blip(90, 0.22, 'sawtooth', 0.045, 1), 70);
     updHud();
     if (S.heroHP <= 0) gameOver();
+  }
+
+  // ---- expedition choices: combat holds until one explicit choice ----
+  const eventOverlay = document.getElementById('ov-event');
+  eventOverlay.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || S.phase !== 'event') return;
+    const buttons = [...eventOverlay.querySelectorAll('button:not(:disabled)')];
+    const i = buttons.indexOf(document.activeElement);
+    e.preventDefault(); buttons[(i + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
+  });
+  function openExpeditionEvent(wave) {
+    const kind = EXPEDITION_EVENTS[wave];
+    if (!kind || S.eventsSeen.includes(wave) || S.phase !== 'play') return false;
+    S.eventsSeen.push(wave); S.eventPending = kind; S.phase = 'event';
+    clearControls(); scr.classList.add('choice-dialog-open');
+    document.getElementById('event-title').textContent = EVENT_NAMES[kind];
+    document.getElementById('event-desc').textContent = `${region.name} · ${wave}웨이브 진입 전 · 하나를 선택하세요`;
+    const cards = document.getElementById('event-cards'); cards.innerHTML = '';
+    const choices = eventChoices(kind, S, ctx.heroMaxHP());
+    for (const choice of choices) {
+      const d = document.createElement('button'); d.type = 'button'; d.className = 'card-pick';
+      d.dataset.choice = choice.id; d.disabled = !!choice.disabled;
+      d.innerHTML = `<div><div class="t1">${choice.title}</div><div class="t2">${choice.text}</div></div>`;
+      d.onclick = () => {
+        if (S.phase !== 'event' || S.eventPending !== kind) return;
+        if (!applyEventChoice(S, choice, ctx.heroMaxHP())) return;
+        S.eventPending = null; S.phase = 'play'; scr.classList.remove('choice-dialog-open');
+        eventOverlay.classList.add('hidden'); updHud();
+        blip(660, 0.12, 'triangle', 0.04);
+      };
+      cards.appendChild(d);
+    }
+    updHud(); eventOverlay.classList.remove('hidden'); cards.querySelector('button:not(:disabled)')?.focus();
+    if (ctx.auto) setTimeout(() => cards.querySelector('button:not(:disabled)')?.click(), 200);
+    return true;
   }
 
   // ---- level up / fusion ----
@@ -1151,6 +1186,8 @@ export async function startBattle(ctx) {
     // spawn waves: time-based, but the wave counter pauses while a boss lives (boss gates progress; pressure rows keep spawning)
     S.spawnTimer -= dt;
     if (S.spawnTimer <= 0) {
+      const nextWave = S.wave + 1;
+      if (openExpeditionEvent(nextWave)) { S.spawnTimer = 0.1; return; }
       S.spawnTimer = SPAWN_INTERVAL;
       const bossAlive = S.enemies.some(e => e.type === 'boss');
       spawnRow(!bossAlive);
@@ -1284,4 +1321,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-  }
+                       }
