@@ -251,6 +251,10 @@ export async function startBattle(ctx) {
     if (advance) S.wave++;
     const w = S.wave;
     if (advance && w % 5 === 0 && w % 10 !== 0) milestone(w); // boss waves pay on boss kill instead
+    if (advance && w % 10 === 9 && !ctx.norender) { // 보스 전조: 다음 웨이브가 보스 웨이브
+      popup(labelsC, innerWidth / 2, innerHeight * 0.24, '거대한 적이 다가옵니다…', 'warn');
+      blip(180, 0.3, 'sine', 0.05);
+    }
     if (advance && w % 10 === 0) { // miniboss wave: single heavy hitter, gates the wave counter until killed
       await spawnEnemy('boss', 0, -6.9);
       updBossBar();
@@ -260,6 +264,8 @@ export async function startBattle(ctx) {
         burst(0, -6.9, 0xff3b30, 24, 5.5, 0.7, { sc: 1.6, vy0: 3, vyR: 3 });
         burst(0, -6.9, 0x3a1414, 10, 3, 0.5, { sc: 1.3, ttl0: 0.9, ttlR: 0.4 }); // dark smoke shards
         ring(0, -6.9, 0xff3b30, 2.4, 0.6);
+        setTimeout(() => ring(0, -6.9, 0xff3b30, 1.7, 0.55), 200); // 연속 충격파
+        setTimeout(() => ring(0, -6.9, 0xff3b30, 1.1, 0.5), 400);
       }
       S.shake = Math.max(S.shake || 0, 0.5);
       blip(196, 0.4, 'sawtooth', 0.07);
@@ -392,7 +398,16 @@ export async function startBattle(ctx) {
     dropGem(e.x + (Math.random() - 0.5) * 0.3, e.z);
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.7, e.z)); popup(labelsC, p.x, p.y, '+' + g, 'gold'); }
     blip(660 * (1 + Math.min(S.combo, 20) * 0.04), 0.09, 'triangle', 0.04); // kill streak pitch rises with combo
-    if (e.type === 'boss') milestone(S.wave); // boss gate: wave-clear reward lands when the boss actually falls
+    if (e.type === 'boss') { // 격파 클라이맥스: 연속 고리 + 검은 잔해 + 강한 흔들림 + 배너
+      S.shake = Math.max(S.shake || 0, 0.25);
+      if (!ctx.norender) {
+        popup(labelsC, innerWidth / 2, innerHeight * 0.26, '미니보스 격파!', 'banner');
+        setTimeout(() => ring(e.x, e.z, kc, 1.7, 0.5), 150);
+        setTimeout(() => ring(e.x, e.z, 0xffffff, 1.1, 0.4), 300);
+        burst(e.x, e.z, 0x3a1414, 12, 3.4, 0.6, { sc: 1.4, ttl0: 0.9, ttlR: 0.4 });
+      }
+      milestone(S.wave); // boss gate: wave-clear reward lands when the boss actually falls
+    }
     updHud();
   }
 
@@ -819,4 +834,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                                                     }
+        }
