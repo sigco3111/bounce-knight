@@ -35,7 +35,8 @@ function doubleSide(root) {
 
 export async function startBattle(ctx) {
   const W = () => window.innerWidth, H = () => window.innerHeight;
-  const VH = () => (W() / H() > 1.2 ? Math.round(H() * 0.68) : H()); // 짧은 가로: 캔버스를 하단 HUD 위 높이로 제한
+  const panel = document.querySelector('#screen-battle > .panel');
+  const VH = () => Math.max(1, H() - (panel?.offsetHeight || 120) - 4); // 모든 화면에서 전투 영역은 HUD 위까지만
   const scr = document.getElementById('screen-battle');
   const labelsC = document.getElementById('bt-labels');
 
@@ -54,12 +55,18 @@ export async function startBattle(ctx) {
 
   const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 80);
   function frameCamera() {
-    camera.aspect = W() / VH(); camera.updateProjectionMatrix();
+    camera.aspect = W() / VH();
+    camera.updateProjectionMatrix();
     camera.position.set(0, 12.9, 12.2);
     camera.lookAt(0, 0, -1.7);
     camera.updateMatrixWorld(true);
   }
-  window.addEventListener('resize', () => { renderer.setSize(W(), VH()); frameCamera(); });
+  const fitViewport = () => {
+    renderer.setSize(W(), VH()); frameCamera();
+    document.getElementById('bt-hint').style.bottom = ((panel?.offsetHeight || 120) + 24) + 'px';
+  };
+  window.addEventListener('resize', fitViewport);
+  if (panel) new ResizeObserver(fitViewport).observe(panel);
   frameCamera();
 
   scene.add(new THREE.AmbientLight(0x5d6d96, 1.4));
@@ -119,7 +126,32 @@ export async function startBattle(ctx) {
   const bossFlash = document.createElement('div');
   bossFlash.id = 'boss-flash';
   labelsC.parentElement.appendChild(bossFlash);
-  const hero = (await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
+  const heroModel = await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5, animate: !ctx.norender, animation: 'Idle' });
+  const hero = heroModel.obj, heroMixer = heroModel.mixer;
+  const heroActions = {};
+  for (const name of ['Idle', 'Running_A', 'Running_Strafe_Left', 'Running_Strafe_Right', 'Walking_Backwards']) {
+    const clip = heroModel.animations.find(a => a.name === name);
+    if (clip && heroMixer) heroActions[name] = heroMixer.clipAction(clip);
+  }
+  let heroMotion = 'Idle';
+  function animateHero(dt, dx, dz) {
+    if (!heroMixer) return;
+    // 조준을 바라보면서 이동 방향에 맞는 보행으로 전환. 이동/발사 수치는 그대로.
+    hero.rotation.y = Math.PI - S.aimDir;
+    let motion = 'Idle';
+    if (Math.hypot(dx, dz) > 0.001) {
+      const forward = dx * Math.sin(S.aimDir) - dz * Math.cos(S.aimDir);
+      const side = dx * Math.cos(S.aimDir) + dz * Math.sin(S.aimDir);
+      motion = Math.abs(side) > Math.abs(forward) ? (side > 0 ? 'Running_Strafe_Right' : 'Running_Strafe_Left') : (forward < 0 ? 'Walking_Backwards' : 'Running_A');
+    }
+    if (motion !== heroMotion && heroActions[motion]) {
+      const prev = heroActions[heroMotion], next = heroActions[motion];
+      next.reset().play();
+      if (prev) next.crossFadeFrom(prev, 0.14, false);
+      heroMotion = motion;
+    }
+    heroMixer.update(dt);
+  }
   scene.add(hero);
 
   // ---- game state ----
@@ -617,6 +649,7 @@ export async function startBattle(ctx) {
   function step(dt) {
     if (S.phase !== 'play') return;
     // hero movement
+    const prevHeroX = S.heroX, prevHeroZ = S.heroZ;
     if (S.moveTarget) {
       const dx = S.moveTarget.x - S.heroX, dz = S.moveTarget.z - S.heroZ;
       const d = Math.hypot(dx, dz);
@@ -630,6 +663,7 @@ export async function startBattle(ctx) {
       }
     }
     hero.position.x = S.heroX; hero.position.z = S.heroZ;
+    animateHero(dt, S.heroX - prevHeroX, S.heroZ - prevHeroZ);
     if (ctx.auto) autoPilot();
     showAim();
     // fire stream
@@ -810,6 +844,13 @@ export async function startBattle(ctx) {
     if (S.phase === 'play') S.now += dt; // 선택/종료 화면에서는 전투 시계와 콤보를 멈춤
     if (S.phase === 'play' && S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
     for (let i = 0; i < sub; i++) step(dt);
+    const followX = W() / H() > 1.2 ? 0 : S.heroX * 0.6; // 세로 화면 가장자리: 부분 수평 추적으로 무기까지 프레임 안에 유지
+    if (S.shake > 0) {
+      S.shake -= dt;
+      const m = S.shake * 1.5;
+      camera.position.set(followX + (Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
+    } else { S.shake = 0; camera.position.set(followX, 12.9, 12.2); }
+    camera.updateMatrixWorld(true);
     if (!ctx.norender || S.fcount % 30 === 0) {
       const placed = [];
       for (const e of [...S.enemies].sort((a, b2) => a.x - b2.x)) {
@@ -830,16 +871,12 @@ export async function startBattle(ctx) {
       evolvedHits: S.evolvedHits, lastEvolvedDmg: S.lastEvolvedDmg, fireMul: Math.round(S.fireMul * 1000) / 1000,
       inv: S.inventory.map(b => b.type + b.lv + (b.evolved ? 'E' : '')),
     });
-    if (S.shake > 0) {
-      S.shake -= dt;
-      const m = S.shake * 1.5;
-      camera.position.set((Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
-    } else if (S.shake !== 0) { S.shake = 0; camera.position.set(0, 12.9, 12.2); }
     if (!ctx.norender) renderer.render(scene, camera);
     raf(loop);
   }
 
   if (ctx.probe) { window.__S = S;
+    window.__heroMotion = () => ({ name: heroMotion, time: heroMixer?.time, rotation: hero.rotation.y, actions: Object.fromEntries(Object.entries(heroActions).map(([k, a]) => [k, { weight: a.getEffectiveWeight(), running: a.isRunning() }])) });
     window.__fx = { fusion: t => fusionFx(t || 'fire', S.heroX, S.heroZ - 0.8), bounce: () => { const b = S.balls[0]; if (b) bounceFx(b); } };
     await spawnEnemy('minion', 0, -3);
     S.aimDir = 0;
