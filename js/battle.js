@@ -34,6 +34,8 @@ function doubleSide(root) {
 }
 
 export async function startBattle(ctx) {
+  // 적 모델을 전투 전에 준비: 진행 중 다운로드 실패로 보스가 누락되지 않게 한다.
+  await Promise.all([...new Set(Object.values(ENEMY_DEFS).map(def => def.u))].map(url => loadModel(url, { poseT: false })));
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const panel = document.querySelector('#screen-battle > .panel');
   const topHud = document.querySelector('#screen-battle > .hud-top');
@@ -965,4 +967,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+      }
