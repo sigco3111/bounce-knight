@@ -59,6 +59,7 @@ function confirmSessionReset() {
   guard.innerHTML = `<div class="ttl" id="save-return-title" style="text-align:center;word-break:keep-all">이번 진행은 저장되지 않았습니다</div><div class="dsc" style="max-width:340px;text-align:center;line-height:1.8">브라우저에 진행을 저장할 수 없습니다.<br>기지로 돌아가면 이번 임시 플레이의<br>골드와 성장이 초기화됩니다.<br>기존 저장 원본은 삭제하지 않습니다.</div><button class="btn" type="button" style="white-space:normal">임시 진행을 초기화하고 기지로</button>`;
   document.body.appendChild(guard);
   const go = guard.querySelector('button'); go.focus();
+  guard.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); go.focus(); } });
   go.onclick = () => { go.disabled = true; location.reload(); };
 }
 
@@ -133,6 +134,7 @@ if (sessionOnly) {
   guard.innerHTML = `<div class="ttl" id="save-guard-title" style="text-align:center;word-break:keep-all">저장 확인이 필요합니다</div><div class="dsc" style="max-width:340px;text-align:center;line-height:1.8">${storageAvailable ? '저장 데이터를 읽을 수 없습니다.<br>기존 원본은 변경하지 않았습니다.' : '브라우저에 진행을 저장할 수 없습니다.<br>이번 플레이는 임시로 진행됩니다.'}<br>임시 플레이는 저장되지 않으며<br>새로고침하면 진행이 사라집니다.</div><button class="btn" type="button">저장 없이 임시 플레이</button>`;
   document.body.appendChild(guard);
   const go = guard.querySelector('button'); go.focus();
+  guard.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); go.focus(); } });
   go.onclick = () => {
     go.disabled = true; guard.remove();
     showSessionNotice(); begin();
