@@ -591,6 +591,9 @@ export async function startBattle(ctx) {
     S.phase = 'play';
   }
 
+  document.getElementById('ov-over').addEventListener('keydown', e => {
+    if (e.key === 'Tab' && S.phase === 'over') { e.preventDefault(); document.getElementById('btn-tobase').focus(); }
+  });
   function gameOver() {
     if (S.over) return;
     S.over = true; S.phase = 'over'; clearControls();
@@ -598,6 +601,7 @@ export async function startBattle(ctx) {
     setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05), 170);
     document.getElementById('over-dsc').textContent = `도달 웨이브 ${S.wave} · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
     document.getElementById('ov-over').classList.remove('hidden');
+    document.getElementById('btn-tobase').focus({ preventScroll: true });
     const finish = () => {
       if (S.phase === 'done') return; // 중복 클릭/자동 복귀가 원정 보상을 두 번 더하지 않게
       S.phase = 'done';
@@ -1016,4 +1020,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+                                             }
