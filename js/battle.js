@@ -179,13 +179,13 @@ export async function startBattle(ctx) {
   function updEnemyLabel(e) {
     e.label.el.innerHTML = `<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
-  function milestone(w) { // wave-clear reward, real gold + heal, not just UI
+  function milestone(w, boss = false) { // wave-clear reward, real gold + heal, not just UI
     const bonus = 10 + w;
     S.gold += bonus;
     const healed = S.heroHP < ctx.heroMaxHP();
     if (healed) S.heroHP++;
     if (!ctx.norender) {
-      popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
+      popup(labelsC, innerWidth / 2, innerHeight * 0.32, `${boss ? '보스 격파!' : '웨이브 ' + w + ' 돌파!'} +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
       burst(S.heroX, S.heroZ, 0xffd76a, 18, 4.2, 0.5, { vy0: 3.5, vyR: 3, ttl0: 0.7, ttlR: 0.3, sc: 1.1 }); // gold fountain at the hero
       burst(S.heroX, S.heroZ, 0xfff6dd, 6, 2, 0.5, { vy0: 2.5, ttl0: 0.4, sc: 0.7 });
       ring(S.heroX, S.heroZ, 0xffd76a, 1.8, 0.55);
@@ -252,7 +252,7 @@ export async function startBattle(ctx) {
     const w = S.wave;
     if (advance && w % 5 === 0 && w % 10 !== 0) milestone(w); // boss waves pay on boss kill instead
     if (advance && w % 10 === 9 && !ctx.norender) { // 보스 전조: 다음 웨이브가 보스 웨이브
-      popup(labelsC, innerWidth / 2, innerHeight * 0.24, '거대한 적이 다가옵니다…', 'warn');
+      popup(labelsC, innerWidth / 2, VH() * 0.28, '다음 웨이브: 보스', 'banner');
       blip(180, 0.3, 'sine', 0.05);
     }
     if (advance && w % 10 === 0) { // miniboss wave: single heavy hitter, gates the wave counter until killed
@@ -401,12 +401,11 @@ export async function startBattle(ctx) {
     if (e.type === 'boss') { // 격파 클라이맥스: 연속 고리 + 검은 잔해 + 강한 흔들림 + 배너
       S.shake = Math.max(S.shake || 0, 0.25);
       if (!ctx.norender) {
-        popup(labelsC, innerWidth / 2, innerHeight * 0.26, '미니보스 격파!', 'banner');
         setTimeout(() => ring(e.x, e.z, kc, 1.7, 0.5), 150);
         setTimeout(() => ring(e.x, e.z, 0xffffff, 1.1, 0.4), 300);
         burst(e.x, e.z, 0x3a1414, 12, 3.4, 0.6, { sc: 1.4, ttl0: 0.9, ttlR: 0.4 });
       }
-      milestone(S.wave); // boss gate: wave-clear reward lands when the boss actually falls
+      milestone(S.wave, true); // boss gate: wave-clear reward lands when the boss actually falls
     }
     updHud();
   }
@@ -834,4 +833,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+          }
