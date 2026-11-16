@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import { REGIONS, regionOpen, regionClear, validRegionProgress } from '../js/content.js';
 
 const root = new URL('../', import.meta.url);
 const battle = fs.readFileSync(new URL('js/battle.js', root), 'utf8');
@@ -73,7 +74,7 @@ console.log(`PASS: ${cases} seeded card selections; distinct new balls, growth p
 
 // Save validation tests use the exact predicate; no browser storage is read or written.
 const main = fs.readFileSync(new URL('js/main.js', root), 'utf8');
-const saveBox = vm.createContext({});
+const saveBox = vm.createContext({ validRegionProgress });
 vm.runInContext(between(main, 'const defaults =', 'const rawSave =') + '\nglobalThis.qa={defaults,validSave};', saveBox);
 const valid = saveBox.qa.defaults();
 assert.ok(saveBox.qa.validSave(valid));
@@ -138,7 +139,7 @@ function storageFixture(initial = {}, failWrites = false, failReads = false, env
     setItem(key, value) { if (failWrites) throw new Error('quota'); writes.push([key, value]); data.set(key, value); },
     removeItem(key) { removed.push(key); data.delete(key); }
   };
-  const box = vm.createContext({ localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
+  const box = vm.createContext({ validRegionProgress, localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
   vm.runInContext(between(main, 'const SAVE_KEY', "window.addEventListener('error'") + '\nglobalThis.qa={offerLegacyImport,persist,get save(){return save},get sessionOnly(){return sessionOnly}};', box);
   return { qa: box.qa, data, writes, removed, elements, reloads: () => reloads, blockWrites() { failWrites = true; } };
 }
@@ -306,7 +307,7 @@ console.log('PASS: ice+iron shatter and poison+fire ignition formulas; actual hi
 const S = { now: 0, heroX: 1, heroZ: 3.4, over: false }; let hurts=0, warningsRemoved=0, warningDisposed=0;
 class Mesh { constructor(g,m){this.material=m;this.rotation={};this.position={set(){}};this.scale={set(){}};} }
 class Mat { dispose(){warningDisposed++;} }
-const box = vm.createContext({ S, Math, ctx:{norender:false}, THREE:{Mesh,MeshBasicMaterial:Mat,DoubleSide:2}, chargeWarningGeo:{},spellWarningGeo:{}, scene:{add(){},remove(){warningsRemoved++;}}, updBossBar(){},ring(){},hurtHero(){hurts++;} });
+const box = vm.createContext({ S, Math, regionIndex:0, ctx:{norender:false}, THREE:{Mesh,MeshBasicMaterial:Mat,DoubleSide:2}, chargeWarningGeo:{},spellWarningGeo:{}, scene:{add(){},remove(){warningsRemoved++;}}, updBossBar(){},ring(){},hurtHero(){hurts++;} });
 vm.runInContext(between(battle,'  function clearEnemyWarning(e) {','  // ---- fx: particle bursts ----')+'\nglobalThis.qa={updateEnemyTactic,clearEnemyWarning};',box);
 const obj=()=>({position:{x:0}});
 const boss={type:'boss',z:-4,x:0,obj:obj(),intent:{stage:'idle',left:0}};
@@ -336,3 +337,12 @@ assert.equal(box.plan({...save,bestWave:10}).target,15);
 assert.equal(box.plan({gold:120,castleLv:1,forgeLv:1,tavernLv:1,bestWave:0}).name,'성');
 console.log('PASS: next-run goal/upgrade preview matches milestone, gold, cost, shortage and effect; no save mutation or purchase.');
 }
+
+assert.ok(validRegionProgress(undefined));
+for (const v of [null, 'dungeon', ['unknown'], ['dungeon','dungeon']]) assert.equal(validRegionProgress(v),false);
+assert.equal(regionOpen({},1),false);assert.equal(regionOpen({clearedRegions:['dungeon']},1),true);
+assert.equal(regionOpen({clearedRegions:['dungeon']},2),false);
+assert.deepEqual(regionClear({clearedRegions:['dungeon']},'ruins'),['dungeon','ruins']);
+assert.deepEqual(regionClear({clearedRegions:['dungeon']},'dungeon'),['dungeon']);
+assert.ok(!saveBox.qa.validSave({...valid,clearedRegions:['bad']}));
+console.log('PASS: optional region progress preserves old saves, validates IDs and unlocks next region only after a clear.');
