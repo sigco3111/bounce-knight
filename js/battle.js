@@ -56,10 +56,10 @@ export async function startBattle(ctx) {
   camera.lookAt(0, 0, -1.7);
   camera.updateMatrixWorld(true);
 
-  scene.add(new THREE.AmbientLight(0x55648a, 1.15));
-  scene.add(new THREE.HemisphereLight(0x4a5c80, 0x2a211a, 0.75));
-  const fillR = new THREE.DirectionalLight(0xffd9b0, 0.35); fillR.position.set(-4, 6, 8); scene.add(fillR);
-  const dirL = new THREE.DirectionalLight(0x9db8e8, 0.55);
+  scene.add(new THREE.AmbientLight(0x5d6d96, 1.4));
+  scene.add(new THREE.HemisphereLight(0x566a92, 0x342a20, 0.95));
+  const fillR = new THREE.DirectionalLight(0xffd9b0, 0.45); fillR.position.set(-4, 6, 8); scene.add(fillR);
+  const dirL = new THREE.DirectionalLight(0x9db8e8, 0.65);
   dirL.position.set(3, 9, 6); scene.add(dirL);
 
   if (new URLSearchParams(location.search).has('projtest')) {
@@ -100,6 +100,9 @@ export async function startBattle(ctx) {
   }
   const btl = new THREE.PointLight(0xff8c3a, 20, 10, 2); btl.position.set(0, 2.1, BACK + 0.8); scene.add(btl);
 
+  // breach boundary telegraph: thin red line at DANGER_Z
+  const dl = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.4 }));
+  dl.rotation.x = -Math.PI / 2; dl.position.set(0, 0.02, DANGER_Z); scene.add(dl);
   const hero = (await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
   scene.add(hero);
 
@@ -462,6 +465,11 @@ export async function startBattle(ctx) {
       }
       if (e.frozen > 0) { e.frozen -= dt; continue; }
       e.z += MARCH_SPEED * e.def.spd * dt;
+      if (!e.warned && e.z > 1.2) { // attack telegraph: enemy about to breach
+        e.warned = true;
+        if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.9, e.z)); popup(labelsC, p.x, p.y, '!', 'warn'); }
+        blip(233, 0.12, 'square', 0.045);
+      }
       e.obj.position.z = e.z;
       if (e.z >= DANGER_Z) {
         S.enemies = S.enemies.filter(x => x !== e);
