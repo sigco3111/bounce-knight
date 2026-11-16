@@ -141,6 +141,12 @@ export async function startBase(ctx) {
     document.getElementById('bld-name').textContent = `${b.name} Lv.${lv}`;
     document.getElementById('bld-desc').textContent = b.desc(lv);
     document.getElementById('bld-cost').textContent = '🪙 ' + cost(lv);
+    const upgrade = document.getElementById('bld-up'), affordable = ctx.save.gold >= cost(lv);
+    upgrade.disabled = !affordable;
+    upgrade.textContent = affordable ? '업그레이드' : '골드 부족';
+    upgrade.style.opacity = affordable ? '1' : '0.65';
+    upgrade.style.cursor = affordable ? 'pointer' : 'not-allowed';
+    upgrade.setAttribute('aria-describedby', 'bld-desc bld-cost');
     reflowLabels();
   }
   document.getElementById('bld-next').onclick = () => { sel = (sel + 1) % BLD.length; upd(); };
