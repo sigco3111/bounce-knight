@@ -24,6 +24,11 @@
     padding:12px 14px 18px; z-index:5; pointer-events:none; }
   .hud-top .big { font-weight:700; font-size:19px; text-shadow:0 2px 0 rgba(0,0,0,.6); color:#ffb3a7; }
   .hud-top .sub { margin-left:auto; font-weight:700; font-size:14px; text-shadow:0 2px 0 rgba(0,0,0,.6); padding-top:3px; color:#cfc6e6; }
+  .hud-top .big { flex-shrink:0; white-space:nowrap; }
+  @media (max-width:480px) {
+    .hud-top { flex-direction:column; gap:2px; }
+    .hud-top .sub { margin-left:0; padding-top:0; line-height:1.5; word-break:keep-all; }
+  }
   .chip { display:inline-flex; align-items:center; gap:5px; background:rgba(35,45,66,.92); border-radius:11px;
     padding:5px 10px; font-weight:700; font-size:13px; color:#e8e2f5; box-shadow:0 2px 0 rgba(0,0,0,.4); }
   .dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
