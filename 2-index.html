@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>볼 × 던전 (개발 빌드)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b0f16;
+    font-family:'Noto Sans CJK KR','Noto Sans KR',sans-serif; touch-action:none; user-select:none; }
+  .screen { position:absolute; inset:0; }
+  .screen canvas { position:absolute; inset:0; z-index:0; }
+  .hidden { display:none !important; }
+
+  /* ---- shared HUD ---- */
+  .hud-top { position:absolute; top:0; left:0; right:0; min-height:64px;
+    background:linear-gradient(rgba(5,7,14,.85), rgba(5,7,14,0)); display:flex; align-items:flex-start;
+    padding:12px 14px 18px; z-index:5; pointer-events:none; }
+  .hud-top .big { font-weight:700; font-size:19px; text-shadow:0 2px 0 rgba(0,0,0,.6); color:#ffb3a7; }
+  .hud-top .sub { margin-left:auto; font-weight:700; font-size:14px; text-shadow:0 2px 0 rgba(0,0,0,.6); padding-top:3px; color:#cfc6e6; }
+  .chip { display:inline-flex; align-items:center; gap:5px; background:rgba(35,45,66,.92); border-radius:11px;
+    padding:5px 10px; font-weight:700; font-size:13px; color:#e8e2f5; box-shadow:0 2px 0 rgba(0,0,0,.4); }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
+
+  .hp-label { position:absolute; z-index:3; transform:translateX(-50%); text-align:center; pointer-events:none; }
+  .hp-label .num { color:#ffd9d4; font-weight:700; font-size:12px; text-shadow:0 0 4px rgba(0,0,0,.9), 0 2px 0 rgba(0,0,0,.7); }
+  .hp-label .bar { width:42px; height:5px; border-radius:3px; background:rgba(0,0,0,.65); margin:1px auto 0; overflow:hidden; }
+  .hp-label .bar i { display:block; height:100%; background:#e0393e; border-radius:3px; }
+
+  .popup { position:absolute; z-index:6; transform:translate(-50%,-50%); color:#ffc94d; font-weight:700; font-size:16px;
+    pointer-events:none; text-shadow:-1px -1px 0 #7a1f12, 1px -1px 0 #7a1f12, -1px 1px 0 #7a1f12, 1px 1px 0 #7a1f12, 0 2px 2px rgba(0,0,0,.5);
+    animation:pop .7s ease-out forwards; }
+  .popup.gold { color:#ffe27a; font-size:13px; }
+  @keyframes pop { 0%{opacity:0; margin-top:0} 15%{opacity:1} 100%{opacity:0; margin-top:-34px} }
+
+  .tag3d { position:absolute; transform:translateX(-50%); background:rgba(12,16,28,.92); border-radius:9px;
+    padding:3px 8px; font-size:11px; font-weight:700; color:#e8e2f5; box-shadow:0 2px 0 rgba(0,0,0,.5);
+    white-space:nowrap; z-index:4; pointer-events:none; }
+  .tag3d .lv { color:#f0a45a; }
+
+  /* ---- battle bottom panel ---- */
+  .panel { position:absolute; left:0; right:0; bottom:0; min-height:120px; background:#1a2130;
+    border-radius:20px 20px 0 0; box-shadow:0 -4px 0 rgba(0,0,0,.5); z-index:6; padding:12px 16px; }
+  .lvl-row { display:flex; align-items:center; gap:10px; }
+  .lvl-badge { background:#b03030; color:#ffe9e6; font-weight:700; font-size:13px; border-radius:10px; padding:4px 10px; box-shadow:0 3px 0 #6e1b1b; }
+  .xp { flex:1; height:12px; background:#0f141f; border-radius:6px; overflow:hidden; }
+  .xp i { display:block; height:100%; width:0%; background:linear-gradient(#b06ae0,#7b3fb0); border-radius:6px; transition:width .3s; }
+  .hearts { font-size:15px; letter-spacing:2px; color:#ff5a5a; text-shadow:0 2px 0 rgba(0,0,0,.5); }
+  .ball-row { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .ball-chip { display:inline-flex; align-items:center; gap:4px; background:#232d42; border-radius:9px; padding:4px 8px;
+    font-size:11px; font-weight:700; color:#dfe6f5; }
+  .hint { position:absolute; bottom:150px; left:0; right:0; text-align:center; color:#9aa7c4; font-size:12px; z-index:5; pointer-events:none;
+    text-shadow:0 1px 0 rgba(0,0,0,.7); }
+
+  /* ---- overlays ---- */
+  .overlay { position:absolute; inset:0; background:rgba(5,7,14,.78); z-index:20; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:24px; }
+  .overlay .ttl { font-size:22px; font-weight:700; color:#f0d9b0; text-shadow:0 2px 0 rgba(0,0,0,.6); }
+  .overlay .dsc { font-size:13px; color:#9aa7c4; }
+  .cards { display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px; }
+  .card-pick { background:#1b2334; border-radius:14px; padding:13px 16px; box-shadow:0 4px 0 rgba(0,0,0,.5);
+    display:flex; align-items:center; gap:12px; cursor:pointer; border:2px solid transparent; }
+  .card-pick:active { border-color:#f0a45a; }
+  .card-pick .ic { width:34px; height:34px; border-radius:50%; flex:none; box-shadow:0 0 10px rgba(255,120,40,.35); }
+  .card-pick .t1 { font-weight:700; font-size:14px; color:#ece6f8; }
+  .card-pick .t2 { font-size:11px; color:#9aa7c4; margin-top:2px; }
+  .btn { background:#c2452d; color:#ffe9e2; font-weight:700; font-size:16px; border-radius:12px; border:none;
+    padding:13px 30px; box-shadow:0 4px 0 #7c2a18; cursor:pointer; font-family:inherit; }
+  .btn:active { transform:translateY(2px); box-shadow:0 2px 0 #7c2a18; }
+  .btn.sub { background:#2a3550; box-shadow:0 4px 0 #141b2c; font-size:14px; padding:11px 20px; }
+
+  /* ---- base screen ---- */
+  .res-bar { position:absolute; top:12px; left:12px; right:12px; height:46px; background:rgba(16,21,36,.95);
+    border-radius:14px; box-shadow:0 3px 0 rgba(0,0,0,.5); display:flex; align-items:center; padding:0 14px; gap:14px; z-index:6; }
+  .res-bar .gap { margin-left:auto; }
+  .title-base { position:absolute; top:66px; left:0; right:0; text-align:center; z-index:6;
+    font-weight:700; font-size:20px; color:#f0d9b0; text-shadow:0 2px 0 rgba(0,0,0,.6); pointer-events:none; }
+  .base-card { position:absolute; left:12px; right:12px; bottom:150px; background:#1b2334; border-radius:16px;
+    box-shadow:0 4px 0 rgba(0,0,0,.5); padding:13px 16px; z-index:6; }
+  .base-card .t1 { font-weight:700; font-size:15px; color:#ece6f8; }
+  .base-card .t2 { font-size:12px; color:#9aa7c4; margin-top:3px; }
+  .base-card .row { display:flex; align-items:center; gap:10px; margin-top:10px; }
+  .base-card .cost { font-weight:700; font-size:14px; color:#ffe27a; }
+  .go-wrap { position:absolute; left:0; right:0; bottom:14px; display:flex; justify-content:center; z-index:6; }
+  #state { position:absolute; left:-9999px; top:-9999px; }
+</style>
+<script>window.createImageBitmap = undefined;</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.js" } }</script>
+</head>
+<body>
+<div id="screen-base" class="screen">
+  <div class="res-bar">
+    <span class="chip">🪙 <span id="base-gold">0</span></span>
+    <span class="chip">🏆 최고 웨이브 <span id="base-best">0</span></span>
+    <span class="gap"></span>
+  </div>
+  <div class="title-base">전진 기지</div>
+  <div id="base-labels"></div>
+  <div class="base-card">
+    <div class="t1" id="bld-name">성 Lv.1</div>
+    <div class="t2" id="bld-desc">영웅 최대 HP +1</div>
+    <div class="row">
+      <span class="cost" id="bld-cost">🪙 60</span>
+      <button class="btn sub" id="bld-up">업그레이드</button>
+      <span style="flex:1"></span>
+      <button class="btn sub" id="bld-next">다른 건물</button>
+    </div>
+  </div>
+  <div class="go-wrap"><button class="btn" id="btn-sortie">출격 ⚔</button></div>
+</div>
+
+<div id="screen-battle" class="screen hidden">
+  <div class="hud-top">
+    <div class="big" id="bt-wave">웨이브 1</div>
+    <div class="sub" id="bt-info">처치 0 · 🪙 0</div>
+  </div>
+  <div id="bt-labels"></div>
+  <div class="hint" id="bt-hint">드래그해서 조준 · 놓으면 발사</div>
+  <div class="panel">
+    <div class="lvl-row">
+      <div class="lvl-badge" id="bt-lv">Lv.1</div>
+      <div class="xp"><i id="bt-xp"></i></div>
+      <div class="hearts" id="bt-hearts">♥♥♥</div>
+    </div>
+    <div class="ball-row" id="bt-balls"></div>
+  </div>
+  <div class="overlay hidden" id="ov-levelup">
+    <div class="ttl">레벨 업!</div>
+    <div class="dsc">하나를 선택하세요</div>
+    <div class="cards" id="lv-cards"></div>
+  </div>
+  <div class="overlay hidden" id="ov-over">
+    <div class="ttl" id="over-ttl">원정 종료</div>
+    <div class="dsc" id="over-dsc"></div>
+    <button class="btn" id="btn-tobase">기지로 돌아가기</button>
+  </div>
+</div>
+<div id="state">{}</div>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
