@@ -45,7 +45,9 @@ export async function startBattle(ctx) {
   const scr = document.getElementById('screen-battle');
   const labelsC = document.getElementById('bt-labels');
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+  catch (_) { const error = new Error('3D graphics initialization failed'); error.code = 'GRAPHICS_INIT_FAILED'; throw error; }
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.setSize(W(), VH());
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1093,4 +1095,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+        }
