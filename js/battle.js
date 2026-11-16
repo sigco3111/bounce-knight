@@ -17,6 +17,7 @@ const BALL_R = 0.2;
 const ENEMY_R = 0.42;
 const SPEED = 10;
 const FIRE_INTERVAL = 0.5;
+const TRAIL_N = 16;
 const SPAWN_INTERVAL = 6.5;
 const MARCH_SPEED = 0.32;  // 초당 전진
 
@@ -107,6 +108,9 @@ export async function startBattle(ctx) {
   const hitFlash = document.createElement('div');
   hitFlash.id = 'hit-flash';
   labelsC.parentElement.appendChild(hitFlash);
+  const fuseFlash = document.createElement('div');
+  fuseFlash.id = 'fuse-flash';
+  labelsC.parentElement.appendChild(fuseFlash);
   const hero = (await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
   scene.add(hero);
 
@@ -115,7 +119,7 @@ export async function startBattle(ctx) {
     phase: 'play', wave: 0, kills: 0, gold: 0, xp: 0, level: 1,
     heroHP: ctx.heroMaxHP(), heroX: 0, heroZ: HERO_Z,
     inventory: [0, 1, 2].map(() => ({ type: 'iron', lv: 1, evolved: false })),
-    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [],
+    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [], parts: [],
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
@@ -208,6 +212,19 @@ export async function startBattle(ctx) {
     S.gems.push({ mesh, x, z, ttl: 12 });
   }
 
+  // ---- fx: particle bursts ----
+  const partGeo = new THREE.TetrahedronGeometry(0.09);
+  function burst(x, z, color, n = 8, spd = 3, y = 0.35) {
+    if (ctx.norender) return;
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color, transparent: true }));
+      const a = Math.random() * Math.PI * 2, s = spd * (0.5 + Math.random() * 0.8);
+      m.position.set(x, y, z);
+      scene.add(m);
+      S.parts.push({ mesh: m, vx: Math.cos(a) * s, vy: 2 + Math.random() * 2.5, vz: Math.sin(a) * s, ttl: 0.55 + Math.random() * 0.2, t: 0 });
+    }
+  }
+
   // ---- balls ----
   const ballGeo = new THREE.SphereGeometry(BALL_R, 18, 18);
   function fireBall(bdef) {
@@ -217,8 +234,16 @@ export async function startBattle(ctx) {
     const mesh = new THREE.Mesh(ballGeo, mat);
     mesh.position.set(S.heroX, 0.3, S.heroZ);
     scene.add(mesh);
+    let trail = null, trailPts = [];
+    if (!ctx.norender) {
+      const tg = new THREE.BufferGeometry();
+      tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
+      trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+      trail.frustumCulled = false;
+      scene.add(trail);
+    }
     const a = S.aimDir;
-    S.balls.push({ def: bdef, mesh, x: S.heroX, z: S.heroZ, vx: Math.sin(a) * SPEED, vz: -Math.cos(a) * SPEED, lastHit: new Map() });
+    S.balls.push({ def: bdef, mesh, trail, trailPts, x: S.heroX, z: S.heroZ, vx: Math.sin(a) * SPEED, vz: -Math.cos(a) * SPEED, lastHit: new Map() });
     blip(520 + Math.random() * 80, 0.05, 'square', 0.02);
   }
 
@@ -229,6 +254,7 @@ export async function startBattle(ctx) {
     if (src.def.evolved) { S.evolvedHits++; S.lastEvolvedDmg = dmg; }
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + dmg); }
     blip(220 + Math.random() * 60, 0.04, 'square', 0.025);
+    burst(e.x, e.z, BALL_TYPES[src.def.type].color, src.def.evolved ? 12 : 7, src.def.evolved ? 4.2 : 3, Math.max(0.4, (e.h || 1) * 0.6));
     if (src.def.type === 'fire') {
       const rad = src.def.evolved ? 1.4 : 0.95, sd = Math.max(1, Math.ceil(dmg / 2));
       for (const o of S.enemies) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < rad) { o.hp -= sd; updEnemyLabel(o); }
@@ -246,6 +272,8 @@ export async function startBattle(ctx) {
     S.enemies = S.enemies.filter(x => x !== e);
     scene.remove(e.obj); labels.remove(e.label);
     S.kills++;
+    burst(e.x, e.z, 0xffd76a, 12, 4.5, 0.55);
+    burst(e.x, e.z, 0xfff6dd, 5, 2.5, 0.9);
     S.shake = Math.max(S.shake || 0, 0.09);
     S.combo = (S.now - S.comboT <= 4) ? S.combo + 1 : 1; // kill streak within 4s
     S.comboT = S.now;
@@ -334,6 +362,9 @@ export async function startBattle(ctx) {
       const nb = { type: c.pair[0].type, lv: c.pair[0].lv, evolved: true }; // fusion keeps the pair's level: evolving always feels like an upgrade
       S.inventory.push(nb);
       if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.3, `융합! ${ballName(nb)} 탄생`, 'banner');
+      burst(S.heroX, S.heroZ - 0.8, 0xffe27a, 22, 5, 0.4);
+      burst(S.heroX, S.heroZ - 0.8, 0xffffff, 8, 2.8, 0.8);
+      fuseFlash.classList.remove('on'); void fuseFlash.offsetWidth; fuseFlash.classList.add('on');
       blip(660, 0.1, 'triangle', 0.05);
       setTimeout(() => blip(990, 0.16, 'triangle', 0.05), 100);
     }
@@ -446,12 +477,24 @@ export async function startBattle(ctx) {
       if (loaded) { fireBall(loaded); S.fireTimer = FIRE_INTERVAL * S.fireMul; }
       else S.fireTimer = 0.12;
     }
+    // fx particles
+    for (const p of [...S.parts]) {
+      p.t += dt;
+      p.mesh.position.x += p.vx * dt; p.mesh.position.z += p.vz * dt;
+      p.mesh.position.y = Math.max(0.06, p.mesh.position.y + p.vy * dt);
+      p.vy -= 9.5 * dt;
+      p.mesh.rotation.x += dt * 6; p.mesh.rotation.y += dt * 7;
+      const k = Math.max(0, 1 - p.t / p.ttl);
+      p.mesh.material.opacity = k;
+      p.mesh.scale.setScalar(Math.max(0.05, k));
+      if (p.t >= p.ttl) { scene.remove(p.mesh); p.mesh.material.dispose(); S.parts = S.parts.filter(q => q !== p); }
+    }
     // balls
     for (const b of [...S.balls]) {
       b.x += b.vx * dt; b.z += b.vz * dt;
-      if (b.x < -AX + BALL_R) { b.x = -AX + BALL_R; b.vx = Math.abs(b.vx); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
-      if (b.x > AX - BALL_R) { b.x = AX - BALL_R; b.vx = -Math.abs(b.vx); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
-      if (b.z < BACK + BALL_R) { b.z = BACK + BALL_R; b.vz = Math.abs(b.vz); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      if (b.x < -AX + BALL_R) { b.x = -AX + BALL_R; b.vx = Math.abs(b.vx); burst(b.x, b.z, 0x9fd8ff, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      if (b.x > AX - BALL_R) { b.x = AX - BALL_R; b.vx = -Math.abs(b.vx); burst(b.x, b.z, 0x9fd8ff, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      if (b.z < BACK + BALL_R) { b.z = BACK + BALL_R; b.vz = Math.abs(b.vz); burst(b.x, b.z, 0x9fd8ff, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
       for (const e of S.enemies) {
         const dx = b.x - e.x, dz = b.z - e.z, d = Math.hypot(dx, dz), rs = BALL_R + ENEMY_R;
         if (d < rs) {
@@ -469,8 +512,17 @@ export async function startBattle(ctx) {
         }
       }
       b.mesh.position.set(b.x, 0.3, b.z);
+      if (b.trail) {
+        b.trailPts.unshift([b.x, 0.3, b.z]);
+        if (b.trailPts.length > TRAIL_N) b.trailPts.pop();
+        const pa = b.trail.geometry.attributes.position, nn = b.trailPts.length;
+        for (let i = 0; i < TRAIL_N; i++) { const q = b.trailPts[Math.min(i, nn - 1)]; pa.setXYZ(i, q[0], q[1], q[2]); }
+        pa.needsUpdate = true;
+        b.trail.geometry.setDrawRange(0, Math.max(2, nn));
+      }
       if (b.z > RETURN_Z && b.vz > 0) {
-        scene.remove(b.mesh); S.balls = S.balls.filter(x => x !== b);
+        scene.remove(b.mesh); if (b.trail) { scene.remove(b.trail); b.trail.geometry.dispose(); b.trail.material.dispose(); }
+        S.balls = S.balls.filter(x => x !== b);
       }
     }
     // enemies march (real time)
