@@ -111,6 +111,7 @@ export async function startBattle(ctx) {
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
+    combo: 0, comboT: -99,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -161,6 +162,14 @@ export async function startBattle(ctx) {
   async function spawnRow() {
     S.wave++;
     const w = S.wave;
+    if (w % 5 === 0) { // wave milestone: real reward, not just UI
+      const bonus = 10 + w;
+      S.gold += bonus;
+      const healed = S.heroHP < ctx.heroMaxHP();
+      if (healed) S.heroHP++;
+      if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
+      blip(880, 0.15, 'sine', 0.06);
+    }
     const count = 1 + Math.min(3, Math.floor((w - 1) / 4));
     const xs = [-2.3, -0.8, 0.8, 2.3].sort(() => Math.random() - 0.5).slice(0, count);
     for (const x of xs) {
@@ -223,7 +232,9 @@ export async function startBattle(ctx) {
     scene.remove(e.obj); labels.remove(e.label);
     S.kills++;
     S.shake = Math.max(S.shake || 0, 0.09);
-    const g = e.def.gold + Math.floor(S.wave / 2);
+    S.combo = (S.now - S.comboT <= 4) ? S.combo + 1 : 1; // kill streak within 4s
+    S.comboT = S.now;
+    const g = e.def.gold + Math.floor(S.wave / 2) + Math.floor(S.combo / 5); // combo pays real gold
     S.gold += g;
     dropGem(e.x + (Math.random() - 0.5) * 0.3, e.z);
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.7, e.z)); popup(labelsC, p.x, p.y, '+' + g, 'gold'); }
@@ -324,7 +335,7 @@ export async function startBattle(ctx) {
   // ---- HUD ----
   function updHud() {
     document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave);
-    document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}`;
+    document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 🔥x${S.combo}` : '');
     document.getElementById('bt-xp').style.width = Math.min(100, S.xp / xpNeed() * 100) + '%';
     document.getElementById('bt-hearts').textContent = '♥'.repeat(Math.max(0, S.heroHP)) || '💀';
     document.getElementById('bt-balls').innerHTML = S.inventory.map(b =>
@@ -492,6 +503,7 @@ export async function startBattle(ctx) {
     if (S.over && S.phase === 'done') return;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     S.now += dt;
+    if (S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
     for (let i = 0; i < sub; i++) step(dt);
     if (!ctx.norender || S.fcount % 30 === 0) {
       const placed = [];
@@ -505,7 +517,7 @@ export async function startBattle(ctx) {
     }
     S.fcount++;
     document.getElementById('state').textContent = JSON.stringify({
-      phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP,
+      phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
       enemies: S.enemies.length, balls: S.balls.length, gems: S.gems.length, gemsGot: S.gemsGot,
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
