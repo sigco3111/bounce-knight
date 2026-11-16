@@ -170,23 +170,36 @@ export async function startBattle(ctx) {
 
   // ---- aim preview (항상 표시) ----
   const aimMat = new THREE.LineDashedMaterial({ color: 0xffb27a, dashSize: 0.28, gapSize: 0.2, transparent: true, opacity: 0.85 });
-  let aimLine = null;
+  // 최대 31점(시작점 + 12 / 0.4)을 재사용. 정지 중에는 GPU 갱신도 생략.
+  const aimGeo = new THREE.BufferGeometry();
+  const aimPos = new THREE.BufferAttribute(new Float32Array(32 * 3), 3).setUsage(THREE.DynamicDrawUsage);
+  const aimDist = new THREE.BufferAttribute(new Float32Array(32), 1).setUsage(THREE.DynamicDrawUsage);
+  aimGeo.setAttribute('position', aimPos); aimGeo.setAttribute('lineDistance', aimDist);
+  const aimLine = new THREE.Line(aimGeo, aimMat);
+  aimLine.frustumCulled = false; // 매번 바운딩 구를 다시 만들지 않는 작은 고정 길이 선
+  scene.add(aimLine);
+  let aimStamp = '';
   function showAim() {
-    const pts = []; let x = S.heroX, z = S.heroZ, dx = Math.sin(S.aimDir), dz = -Math.cos(S.aimDir);
-    pts.push(new THREE.Vector3(x, 0.25, z));
-    let len = 0;
+    const stamp = S.heroX + ',' + S.heroZ + ',' + S.aimDir;
+    if (stamp === aimStamp) return;
+    aimStamp = stamp;
+    let x = S.heroX, z = S.heroZ, dx = Math.sin(S.aimDir), dz = -Math.cos(S.aimDir);
+    let count = 1, len = 0, distance = 0;
+    aimPos.setXYZ(0, x, 0.25, z); aimDist.setX(0, 0);
     while (len < 12) {
       const step = 0.4;
       let nx = x + dx * step, nz = z + dz * step;
       if (nx < -AX + BALL_R || nx > AX - BALL_R) { dx = -dx; nx = x + dx * step; }
       if (nz < BACK + BALL_R) { dz = -dz; nz = z + dz * step; }
+      // 이전 Float32BufferAttribute의 점 간 거리와 같은 대시 위상 유지
+      const px = aimPos.getX(count - 1), pz = aimPos.getZ(count - 1);
+      aimPos.setXYZ(count, nx, 0.25, nz);
+      distance += Math.hypot(aimPos.getX(count) - px, aimPos.getZ(count) - pz);
+      aimDist.setX(count, distance); count++;
       x = nx; z = nz; len += step;
-      pts.push(new THREE.Vector3(x, 0.25, z));
     }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    if (aimLine) { aimLine.geometry.dispose(); aimLine.geometry = geo; }
-    else { aimLine = new THREE.Line(geo, aimMat); scene.add(aimLine); }
-    aimLine.computeLineDistances();
+    aimGeo.setDrawRange(0, count);
+    aimPos.needsUpdate = true; aimDist.needsUpdate = true;
   }
 
   // ---- enemies ----
@@ -883,6 +896,7 @@ export async function startBattle(ctx) {
   }
 
   if (ctx.probe) { window.__S = S;
+    window.__aimBuffer = () => ({ geometry: aimGeo.uuid, position: aimPos.uuid, count: aimGeo.drawRange.count, version: aimPos.version, points: Array.from(aimPos.array).slice(0, aimGeo.drawRange.count * 3), distances: Array.from(aimDist.array).slice(0, aimGeo.drawRange.count) });
     window.__heroMotion = () => ({ name: heroMotion, time: heroMixer?.time, rotation: hero.rotation.y, actions: Object.fromEntries(Object.entries(heroActions).map(([k, a]) => [k, { weight: a.getEffectiveWeight(), running: a.isRunning() }])) });
     window.__fx = { fusion: t => fusionFx(t || 'fire', S.heroX, S.heroZ - 0.8), bounce: () => { const b = S.balls[0]; if (b) bounceFx(b); } };
     await spawnEnemy('minion', 0, -3);
