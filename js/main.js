@@ -1,9 +1,15 @@
 import { startBase } from './base.js';
 import { startBattle } from './battle.js';
 
-const SAVE_KEY = 'bb_save_v1';
+const SAVE_KEY = 'bounceknight_save_v1'; // unique under sigco3111.github.io (origin is shared with other games)
+const OLD_KEY = 'bb_save_v1';
 const storage = (() => { try { const t = '__bb_t'; localStorage.setItem(t, '1'); localStorage.removeItem(t); return localStorage; } catch (e) { const mem = {}; return { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } }; } })();
-const save = JSON.parse(storage.getItem(SAVE_KEY) || 'null') || {
+let save = JSON.parse(storage.getItem(SAVE_KEY) || 'null');
+if (!save) { // one-time migration from the old generic key
+  const old = storage.getItem(OLD_KEY);
+  if (old) { save = JSON.parse(old); storage.setItem(SAVE_KEY, old); storage.removeItem(OLD_KEY); }
+}
+save = save || {
   gold: 120, castleLv: 1, forgeLv: 1, tavernLv: 1, bestWave: 0,
 };
 function persist() { storage.setItem(SAVE_KEY, JSON.stringify(save)); }
