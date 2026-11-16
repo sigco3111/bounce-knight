@@ -95,14 +95,15 @@
   .cards { display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px; }
   .card-pick { background:#1b2334; border-radius:14px; padding:13px 16px; box-shadow:0 4px 0 rgba(0,0,0,.5);
     display:flex; align-items:center; gap:12px; cursor:pointer; border:2px solid transparent; }
-  #ov-levelup { box-sizing:border-box; padding:22px 18px; overflow-y:auto; gap:10px; }
-  #ov-levelup .cards { width:100%; max-width:440px; gap:8px; flex-shrink:0; }
-  #ov-levelup .card-pick { padding:11px 13px; min-height:44px; }
-  #ov-levelup .t1, #ov-levelup .t2 { word-break:keep-all; overflow-wrap:anywhere; }
+  #ov-event button:disabled { opacity:0.45; cursor:not-allowed; }
+  #ov-event, #ov-levelup { box-sizing:border-box; padding:22px 18px; overflow-y:auto; gap:10px; }
+  #ov-event .cards, #ov-levelup .cards { width:100%; max-width:440px; gap:8px; flex-shrink:0; }
+  #ov-event .card-pick, #ov-levelup .card-pick { padding:11px 13px; min-height:44px; }
+  #ov-event .t1, #ov-event .t2, #ov-levelup .t1, #ov-levelup .t2 { word-break:keep-all; overflow-wrap:anywhere; }
   @media (max-height:540px) {
-    #ov-levelup { justify-content:flex-start; padding:12px 18px; gap:7px; }
-    #ov-levelup .cards { width:100%; max-width:720px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
-    #ov-levelup .card-pick { padding:9px 11px; }
+    #ov-event, #ov-levelup { justify-content:flex-start; padding:12px 18px; gap:7px; }
+    #ov-event .cards, #ov-levelup .cards { width:100%; max-width:720px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    #ov-event .card-pick, #ov-levelup .card-pick { padding:9px 11px; }
   }
   .card-pick { width:100%; box-sizing:border-box; text-align:left; font-family:inherit; color:inherit; }
   .card-pick:active { border-color:#f0a45a; }
@@ -202,6 +203,12 @@
       <div class="hearts" id="bt-hearts">♥♥♥</div>
     </div>
     <div class="ball-row" id="bt-balls"></div>
+  </div>
+  <div class="overlay hidden" id="ov-event" role="dialog" aria-modal="true" aria-labelledby="event-title">
+    <div class="ttl" id="event-title"></div>
+    <div class="dsc" id="event-desc" style="text-align:center"></div>
+    <div class="cards" id="event-cards"></div>
+    <div class="dsc">전투 시간은 선택하는 동안 멈춥니다.</div>
   </div>
   <div class="overlay hidden" id="ov-levelup" role="dialog" aria-modal="true" aria-labelledby="lv-title">
     <div class="ttl" id="lv-title">레벨 업!</div>
