@@ -434,7 +434,7 @@ export async function startBattle(ctx) {
     return null;
   }
   function levelUp() {
-    S.phase = 'levelup'; S.level++;
+    S.phase = 'levelup'; clearControls(); S.level++;
     // 네 장: 서로 다른 새 공 2종 / 융합 우선 또는 강화 / 패시브
     const elements = ['fire', 'ice', 'bolt', 'poison'];
     for (let i = elements.length - 1; i > 0; i--) {
@@ -507,7 +507,7 @@ export async function startBattle(ctx) {
 
   function gameOver() {
     if (S.over) return;
-    S.over = true; S.phase = 'over';
+    S.over = true; S.phase = 'over'; clearControls();
     blip(200, 0.3, 'sawtooth', 0.055);
     setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05), 170);
     document.getElementById('over-dsc').textContent = `도달 웨이브 ${S.wave} · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
@@ -546,6 +546,14 @@ export async function startBattle(ctx) {
     return Math.max(-1.25, Math.min(1.25, a));
   }
   const touches = { move: null, aim: null };
+  function clearControls() {
+    const ids = [touches.move, touches.aim];
+    touches.move = null; touches.aim = null; S.moveTarget = null;
+    for (const id of ids) if (id != null) {
+      try { if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id); } catch (_) { /* 이미 해제된 포인터 */ }
+    }
+  }
+  window.addEventListener('blur', clearControls); // 화면을 벗어나면 조작 잔류 방지
   let hintGone = false;
   canvas.addEventListener('pointerdown', e => {
     if (S.phase !== 'play') return;
@@ -840,4 +848,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                     }
+}
