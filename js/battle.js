@@ -520,8 +520,13 @@ export async function startBattle(ctx) {
     setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05), 170);
     document.getElementById('over-dsc').textContent = `도달 웨이브 ${S.wave} · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
     document.getElementById('ov-over').classList.remove('hidden');
-    document.getElementById('btn-tobase').onclick = () => ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills });
-    if (ctx.auto) setTimeout(() => ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills }), 1500);
+    const finish = () => {
+      if (S.phase === 'done') return; // 중복 클릭/자동 복귀가 원정 보상을 두 번 더하지 않게
+      S.phase = 'done';
+      ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills });
+    };
+    document.getElementById('btn-tobase').onclick = finish;
+    if (ctx.auto) setTimeout(finish, 1500);
   }
 
   // ---- HUD ----
@@ -856,4 +861,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+    }
