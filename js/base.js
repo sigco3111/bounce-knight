@@ -15,9 +15,11 @@ export async function startBase(ctx) {
   // bind the sortie CTA before any model loads: the button is visible HTML and must never be dead on slow networks
   document.getElementById('btn-sortie').onclick = () => ctx.onSortie();
 
+  const CW = () => W() / H() > 1.2 ? Math.round(W() * 0.56) : W();
+  let reflowLabels = () => {};
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  renderer.setSize(W(), H());
+  renderer.setSize(CW(), H());
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.3;
   scr.prepend(renderer.domElement);
@@ -25,8 +27,8 @@ export async function startBase(ctx) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0f1c);
   scene.fog = new THREE.Fog(0x0a0f1c, 10, 26);
-  const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 80);
-  const resize = () => { renderer.setSize(W(), H()); camera.aspect = W() / H(); camera.updateProjectionMatrix(); };
+  const camera = new THREE.PerspectiveCamera(40, CW() / H(), 0.1, 80);
+  const resize = () => { renderer.setSize(CW(), H()); camera.aspect = CW() / H(); camera.updateProjectionMatrix(); reflowLabels(); };
   window.addEventListener('resize', resize);
   camera.position.set(0, 10.8, 13.6);
   camera.lookAt(0, 0, -0.4);
@@ -42,7 +44,7 @@ export async function startBase(ctx) {
   const labels = new HtmlLabels(document.getElementById('base-labels'));
   const proj = v => {
     const p = v.clone().project(camera);
-    return { x: (p.x * 0.5 + 0.5) * W(), y: (-p.y * 0.5 + 0.5) * H() };
+    return { x: (p.x * 0.5 + 0.5) * CW(), y: (-p.y * 0.5 + 0.5) * H() };
   };
 
   const HEX = './models/hex_grass.gltf';
@@ -63,16 +65,18 @@ export async function startBase(ctx) {
     home: { pos: [-CX, HD / 2], model: B + 'building_home_A_blue.gltf', h: 1.0, label: '민가' },
     barracks: { pos: [CX, HD / 2], model: B + 'building_barracks_blue.gltf', h: 1.05, label: '훈련소' },
   };
-  const tagItems = {};
+  const tagItems = {}, labelAnchors = {}, buildingRoots = [];
   for (const [k, sp] of Object.entries(spots)) {
     const m = await loadModel(sp.model, { h: sp.h, x: sp.pos[0], z: sp.pos[1], y: tileTop });
     scene.add(m.obj);
+    if (BLD.some(b => b.key === k)) { m.obj.userData.buildingKey = k; buildingRoots.push(m.obj); }
     const name = BLD.find(b => b.key === k)?.name || sp.label;
     tagItems[k] = labels.add('tag3d', '');
     const p = proj(new THREE.Vector3(sp.pos[0], m.topY !== undefined ? 0 : 0, sp.pos[1]));
     // compute label position from building top
     const box = new THREE.Box3().setFromObject(m.obj);
-    const pp = proj(new THREE.Vector3(sp.pos[0], box.max.y + 0.25, sp.pos[1]));
+    labelAnchors[k] = new THREE.Vector3(sp.pos[0], box.max.y + 0.25, sp.pos[1]);
+    const pp = proj(labelAnchors[k]);
     labels.place(tagItems[k], Math.max(62, Math.min(W() - 62, pp.x)), pp.y);
     tagItems[k].el.dataset.key = k; tagItems[k].el.dataset.name = name;
   }
@@ -89,17 +93,51 @@ export async function startBase(ctx) {
   const l3 = new THREE.PointLight(0xff9a4a, 6, 5, 2); l3.position.set(CX, 0.9, -HD / 2 + 0.25); scene.add(l3);
 
   let sel = 0;
+  function selectBuilding(key) {
+    const i = BLD.findIndex(b => b.key === key);
+    if (i < 0) return;
+    sel = i; upd(); // 선택만 변경. 업그레이드는 별도 버튼으로만 실행.
+  }
+  for (const [key, it] of Object.entries(tagItems)) if (BLD.some(b => b.key === key)) {
+    it.el.setAttribute('role', 'button'); it.el.tabIndex = 0;
+    it.el.style.pointerEvents = 'auto'; it.el.style.cursor = 'pointer';
+    it.el.onclick = () => selectBuilding(key);
+    it.el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectBuilding(key); } };
+  }
+  const pickRay = new THREE.Raycaster();
+  renderer.domElement.addEventListener('pointerup', e => {
+    if (scr.classList.contains('hidden')) return;
+    const r = renderer.domElement.getBoundingClientRect();
+    pickRay.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+    const hit = pickRay.intersectObjects(buildingRoots, true)[0];
+    let o = hit?.object;
+    while (o && !o.userData.buildingKey) o = o.parent;
+    if (o) selectBuilding(o.userData.buildingKey);
+  });
+  reflowLabels = () => {
+    const placed = [];
+    for (const [key, it] of Object.entries(tagItems)) {
+      const p = proj(labelAnchors[key]);
+      const w = it.el.offsetWidth, h = it.el.offsetHeight;
+      const x = Math.max(w / 2 + 8, Math.min(CW() - w / 2 - 8, p.x));
+      let y = Math.max(104, p.y);
+      while (placed.some(q => Math.abs(q.x - x) < (q.w + w) / 2 + 4 && y < q.y + q.h + 3 && y + h + 3 > q.y)) y += h + 4;
+      placed.push({ x, y, w, h }); labels.place(it, x, y);
+    }
+  };
   function upd() {
     document.getElementById('base-gold').textContent = ctx.save.gold;
     document.getElementById('base-best').textContent = ctx.save.bestWave;
     for (const [k, it] of Object.entries(tagItems)) {
       const b = BLD.find(x => x.key === k);
-      it.el.innerHTML = b ? `${b.name} <span class="lv">Lv.${ctx.save[k]}</span>` : it.el.dataset.name;
+      if (b) { const active = b.key === BLD[sel].key; it.el.setAttribute('aria-pressed', String(active)); it.el.style.outline = active ? '1px solid #e7ab59' : ''; }
+      it.el.innerHTML = b ? `${b.name.split(' ·')[0]} <span class="lv">Lv.${ctx.save[k]}</span>` : it.el.dataset.name;
     }
     const b = BLD[sel], lv = ctx.save[b.key];
     document.getElementById('bld-name').textContent = `${b.name} Lv.${lv}`;
     document.getElementById('bld-desc').textContent = b.desc(lv);
     document.getElementById('bld-cost').textContent = '🪙 ' + cost(lv);
+    reflowLabels();
   }
   document.getElementById('bld-next').onclick = () => { sel = (sel + 1) % BLD.length; upd(); };
   document.getElementById('bld-up').onclick = () => {
