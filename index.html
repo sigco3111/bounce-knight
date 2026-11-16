@@ -197,6 +197,17 @@
   </div>
 </div>
 <div id="state">{}</div>
-<script type="module" src="./js/main.js"></script>
+<script type="module">
+import('./js/main.js').catch(() => {
+  const guard = document.createElement('div'); guard.className = 'overlay'; guard.id = 'bootstrap-error-guard';
+  guard.setAttribute('role', 'dialog'); guard.setAttribute('aria-modal', 'true'); guard.setAttribute('aria-labelledby', 'bootstrap-error-title');
+  guard.style.cssText = 'position:fixed;z-index:60;background:#080d19;padding:16px;box-sizing:border-box;text-align:center';
+  guard.innerHTML = '<div class="ttl" id="bootstrap-error-title">게임을 불러오지 못했습니다</div><div class="dsc" style="line-height:1.8">연결을 확인한 뒤 다시 불러와 주세요.<br>저장 원본은 삭제하지 않습니다.</div><button class="btn" type="button">다시 불러오기</button>';
+  document.body.appendChild(guard);
+  const go = guard.querySelector('button'); go.focus();
+  guard.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); go.focus(); } });
+  go.onclick = () => { go.disabled = true; location.reload(); };
+});
+</script>
 </body>
 </html>
