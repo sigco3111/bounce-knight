@@ -797,8 +797,8 @@ export async function startBattle(ctx) {
   function loop(t) {
     if (S.over && S.phase === 'done') return;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    S.now += dt;
-    if (S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
+    if (S.phase === 'play') S.now += dt; // 선택/종료 화면에서는 전투 시계와 콤보를 멈춤
+    if (S.phase === 'play' && S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
     for (let i = 0; i < sub; i++) step(dt);
     if (!ctx.norender || S.fcount % 30 === 0) {
       const placed = [];
@@ -861,4 +861,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-    }
+}
