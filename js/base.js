@@ -108,5 +108,9 @@ export async function startBase(ctx) {
   };
   upd();
 
-  (function loop() { renderer.render(scene, camera); requestAnimationFrame(loop); })();
+  (function loop() {
+    if (scr.classList.contains('hidden')) return; // 출격 후 숨겨진 기지를 계속 그리지 않음
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  })();
 }
