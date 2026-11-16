@@ -1,3 +1,4 @@
+import { REGIONS, regionOpen } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, nextExpeditionPlan } from './common.js';
 
@@ -13,7 +14,26 @@ export async function startBase(ctx) {
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const scr = document.getElementById('screen-base');
   // bind the sortie CTA before any model loads: the button is visible HTML and must never be dead on slow networks
-  document.getElementById('btn-sortie').onclick = () => ctx.onSortie();
+  let selectedRegion = 0;
+  const regionRow = document.getElementById('region-options');
+  const regionDetail = document.getElementById('region-detail');
+  function chooseRegion(i) {
+    if (!regionOpen(ctx.save, i)) return;
+    selectedRegion = i;
+    [...regionRow.children].forEach((b, n) => b.setAttribute('aria-pressed', String(n === i)));
+    const r = REGIONS[i];
+    regionDetail.textContent = `${r.boss} · 10웨이브 · ${r.hazard}`;
+    document.getElementById('base-goal').textContent = `${r.name} 10웨이브 정복${(ctx.save.clearedRegions || []).includes(r.id) ? ' · 정복 완료' : (REGIONS[i + 1] ? ' · 다음 지역 해금' : ' · 마지막 지역')}`;
+    document.getElementById('btn-sortie').textContent = `${r.name} 출격 ⚔`;
+  }
+  regionRow.innerHTML = '';
+  REGIONS.forEach((r, i) => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.textContent = (regionOpen(ctx.save, i) ? '' : '🔒 ') + r.name;
+    b.disabled = !regionOpen(ctx.save, i); b.onclick = () => chooseRegion(i); regionRow.appendChild(b);
+  });
+  chooseRegion(0);
+  document.getElementById('btn-sortie').onclick = () => ctx.onSortie(selectedRegion);
 
   const CW = () => W() / H() > 1.2 ? Math.round(W() * 0.56) : W();
   let reflowLabels = () => {};
@@ -148,7 +168,7 @@ export async function startBase(ctx) {
     upgrade.style.cursor = affordable ? 'pointer' : 'not-allowed';
     upgrade.setAttribute('aria-describedby', 'bld-desc bld-cost');
     const plan = nextExpeditionPlan(ctx.save);
-    document.getElementById('base-goal').textContent = `다음 목표: 웨이브 ${plan.target}${plan.target % 10 === 0 ? ' · 보스 도전' : ''}`;
+    chooseRegion(selectedRegion);
     document.getElementById('base-growth').textContent = `추천 ${plan.name}: ${plan.benefit} · ${plan.shortage ? plan.shortage + '골드 더' : '강화 가능'}`;
     reflowLabels();
   }
