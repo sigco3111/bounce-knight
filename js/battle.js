@@ -653,9 +653,9 @@ export async function startBattle(ctx) {
   const pauseButton = document.createElement('button');
   pauseButton.type = 'button'; pauseButton.id = 'btn-pause'; pauseButton.textContent = 'Ⅱ';
   pauseButton.setAttribute('aria-label', '전투 일시정지');
-  pauseButton.style.cssText = 'position:absolute;right:12px;top:10px;width:38px;height:38px;border:1px solid #5e6b88;border-radius:10px;background:#1b2334;color:#ece6f8;font:700 20px sans-serif;z-index:10;cursor:pointer';
+  pauseButton.style.cssText = 'position:absolute;right:10px;top:8px;width:44px;height:44px;border:1px solid #5e6b88;border-radius:10px;background:#1b2334;color:#ece6f8;font:700 20px sans-serif;z-index:10;cursor:pointer';
   scr.appendChild(pauseButton);
-  topHud.style.paddingRight = '60px';
+  topHud.style.paddingRight = '68px';
   const pauseOverlay = document.createElement('div');
   pauseOverlay.id = 'ov-pause'; pauseOverlay.className = 'overlay hidden';
   pauseOverlay.setAttribute('role', 'dialog'); pauseOverlay.setAttribute('aria-modal', 'true'); pauseOverlay.setAttribute('aria-labelledby', 'pause-title');
@@ -985,6 +985,7 @@ export async function startBattle(ctx) {
   } else { await spawnRow(true); await spawnRow(true); }
   document.getElementById('bt-loading')?.classList.add('hidden'); // assets ready: reveal the battlefield
   updHud(); showAim();
+  if (document.hidden) pauseBattle(); // assets may have finished after the user left
   raf(loop);
 
   // input-path test hook: 왼쪽 드래그(이동) + 오른쪽 드래그(조준) 합성 이벤트를 실제 핸들러에 통과
@@ -1010,4 +1011,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                                                                                 }
+    }
