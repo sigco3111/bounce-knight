@@ -66,8 +66,15 @@ export function popup(container, x, y, text, cls = '') {
 const AUDIO_KEY = 'bounceknight_audio_muted_v1';
 let audioMuted = false, audioPaused = false;
 try { audioMuted = localStorage.getItem(AUDIO_KEY) === '1'; } catch (_) { /* session setting only */ }
-const voices = new Set();
-function stopVoices() { for (const o of voices) { try { o.stop(); } catch (_) {} } }
+const MAX_VOICES = 16;
+const voices = new Map();
+function stopVoice(o) {
+  const voice = voices.get(o); if (!voice) return;
+  voices.delete(o);
+  try { o.stop(); } catch (_) { /* already ended */ }
+  o.disconnect(); voice.gain.disconnect();
+}
+function stopVoices() { for (const o of voices.keys()) stopVoice(o); }
 export const isAudioMuted = () => audioMuted;
 export function setAudioMuted(muted) {
   audioMuted = !!muted;
@@ -76,8 +83,14 @@ export function setAudioMuted(muted) {
 }
 export function setAudioPaused(paused) { audioPaused = !!paused; if (audioPaused) stopVoices(); }
 let actx = null;
-export function blip(f = 440, d = 0.05, type = 'square', g = 0.035) {
+export function blip(f = 440, d = 0.05, type = 'square', g = 0.035, priority = 0) {
   if (audioMuted || audioPaused) return;
+  if (voices.size >= MAX_VOICES) {
+    let victim = null, lowest = Infinity;
+    for (const [o, voice] of voices) if (voice.priority < lowest) { victim = o; lowest = voice.priority; }
+    if (priority <= lowest) return;
+    stopVoice(victim); // health/end cues may replace an older routine shot or impact
+  }
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === 'suspended') actx.resume();
@@ -86,8 +99,8 @@ export function blip(f = 440, d = 0.05, type = 'square', g = 0.035) {
     gn.gain.setValueAtTime(g, actx.currentTime);
     gn.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + d);
     o.connect(gn); gn.connect(actx.destination);
-    voices.add(o);
-    o.onended = () => { voices.delete(o); o.disconnect(); gn.disconnect(); };
+    voices.set(o, { priority, gain: gn });
+    o.onended = () => { if (!voices.has(o)) return; voices.delete(o); o.disconnect(); gn.disconnect(); };
     o.start(); o.stop(actx.currentTime + d);
   } catch (e) { /* no audio */ }
 }
