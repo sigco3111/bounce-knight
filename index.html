@@ -108,6 +108,7 @@
   .base-card .row { display:flex; align-items:center; gap:10px; margin-top:10px; }
   .base-card .cost { font-weight:700; font-size:14px; color:#ffe27a; }
   .go-wrap { position:absolute; left:0; right:0; bottom:14px; display:flex; justify-content:center; z-index:6; }
+  @media (max-height: 500px) { .hint { top:64px; bottom:auto; } } /* 짧은 가로 화면: 안내를 상단으로 옮겨 영웅 줄을 비움 */
   .base-hint { position:absolute; left:0; right:0; bottom:72px; text-align:center; color:#9aa7c4; font-size:12px; z-index:6; pointer-events:none; padding:0 16px; }
   #state { position:absolute; left:-9999px; top:-9999px; }
 </style>
@@ -133,7 +134,7 @@
       <button class="btn sub" id="bld-next">다른 건물</button>
     </div>
   </div>
-  <div class="base-hint">건물을 탭해 강화하고 출격하세요 · 전투: 왼쪽 드래그 이동, 오른쪽 드래그 조준</div>
+  <div class="base-hint">건물을 탭해 강화하고 출격하세요.<br>전투는 왼쪽 이동 · 오른쪽 조준 드래그</div>
   <div class="go-wrap"><button class="btn" id="btn-sortie">출격 ⚔</button></div>
 </div>
 
