@@ -331,11 +331,16 @@ export async function startBattle(ctx) {
     S.shake = Math.max(S.shake || 0, 0.09);
     S.combo = (S.now - S.comboT <= 4) ? S.combo + 1 : 1; // kill streak within 4s
     S.comboT = S.now;
+    if (!ctx.norender && S.combo >= 5 && S.combo % 5 === 0) {
+      popup(labelsC, innerWidth / 2, innerHeight * 0.22, `x${S.combo} 연속 처치!`, 'combo');
+      blip(660 + S.combo * 22, 0.16, 'triangle', 0.05);
+      ring(e.x, e.z, 0xffb347, 1.4, 0.45);
+    }
     const g = e.def.gold + Math.floor(S.wave / 2) + Math.floor(S.combo / 5); // combo pays real gold
     S.gold += g;
     dropGem(e.x + (Math.random() - 0.5) * 0.3, e.z);
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.7, e.z)); popup(labelsC, p.x, p.y, '+' + g, 'gold'); }
-    blip(660, 0.09, 'triangle', 0.04);
+    blip(660 * (1 + Math.min(S.combo, 20) * 0.04), 0.09, 'triangle', 0.04); // kill streak pitch rises with combo
     if (e.type === 'boss') milestone(S.wave); // boss gate: wave-clear reward lands when the boss actually falls
     updHud();
   }
@@ -696,6 +701,7 @@ export async function startBattle(ctx) {
     await spawnEnemy('minion', 0, -3);
     S.aimDir = 0;
   } else { await spawnRow(true); await spawnRow(true); }
+  document.getElementById('bt-loading')?.classList.add('hidden'); // assets ready: reveal the battlefield
   updHud(); showAim();
   raf(loop);
 
