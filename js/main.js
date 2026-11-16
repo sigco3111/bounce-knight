@@ -1,3 +1,4 @@
+import { REGIONS, regionOpen, regionClear, validRegionProgress } from './content.js';
 import { startBase } from './base.js';
 import { startBattle } from './battle.js';
 
@@ -16,7 +17,7 @@ try {
 const defaults = () => ({ gold: 120, castleLv: 1, forgeLv: 1, tavernLv: 1, bestWave: 0 });
 const saveFields = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
 const validSave = o => o && typeof o === 'object' && !Array.isArray(o) &&
-  saveFields.every(k => Number.isSafeInteger(o[k]) && o[k] >= (k.endsWith('Lv') ? 1 : 0));
+  saveFields.every(k => Number.isSafeInteger(o[k]) && o[k] >= (k.endsWith('Lv') ? 1 : 0)) && validRegionProgress(o.clearedRegions);
 const rawSave = storage.getItem(SAVE_KEY);
 let save = defaults(), sessionOnly = !storageAvailable;
 if (rawSave !== null) {
@@ -74,7 +75,7 @@ const auto = params.has('auto'), fast = params.has('fast'), inputTest = params.h
 
 const scrBase = document.getElementById('screen-base');
 const scrBattle = document.getElementById('screen-battle');
-let current = null;
+let current = null, selectedRegion = 0;
 
 const mark = s => { const el = document.getElementById('state'); el.dataset.marks = (el.dataset.marks || '') + '|' + s; };
 async function showBase() {
@@ -88,7 +89,9 @@ async function showBase() {
   offerLegacyImport();
   if (auto) document.getElementById('btn-sortie').click();
 }
-async function showBattle() {
+async function showBattle(regionIndex = selectedRegion) {
+  if (!Number.isInteger(regionIndex) || !regionOpen(save, regionIndex)) regionIndex = 0;
+  selectedRegion = regionIndex;
   if (current === 'battle') return; // 빠른 연타/중복 호출도 한 전장만 생성
   current = 'battle'; // 첫 await 전에 잠금
   document.getElementById('btn-sortie').disabled = true;
@@ -100,6 +103,7 @@ async function showBattle() {
   document.getElementById('ov-levelup').classList.add('hidden');
   try { await startBattle({
     save,
+    region: REGIONS[selectedRegion], regionIndex: selectedRegion,
     isSessionOnly: () => sessionOnly,
     dmgMul: () => 1 + (save.forgeLv - 1) * 0.2,
     heroMaxHP: () => 3 + save.castleLv - 1,
@@ -108,6 +112,7 @@ async function showBattle() {
     onEnd: (res) => {
       save.gold += res.gold;
       save.bestWave = Math.max(save.bestWave, res.wave);
+      if (res.victory) save.clearedRegions = regionClear(save, res.region);
       persist();
       if (auto) {
         document.getElementById('state').dataset.result = JSON.stringify({ ...res, saveGold: save.gold, bestWave: save.bestWave });
