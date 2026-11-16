@@ -70,3 +70,54 @@ assert.deepEqual(Array.from(f.S.inventory, b => b.lv), [3, 3]);
 f = fixture([ball()], 5, 0.6);
 assert.equal(f.cards[3].dataset.kind, 'mul'); // full HP and capped haste excluded
 console.log(`PASS: ${cases} seeded card selections; distinct new balls, growth priority, evolved-only growth, one choice, damage formulas, passive limits.`);
+
+// Save validation tests use the exact predicate; no browser storage is read or written.
+const main = fs.readFileSync(new URL('js/main.js', root), 'utf8');
+const saveBox = vm.createContext({});
+vm.runInContext(between(main, 'const defaults =', 'const rawSave =') + '\nglobalThis.qa={defaults,validSave};', saveBox);
+const valid = saveBox.qa.defaults();
+assert.ok(saveBox.qa.validSave(valid));
+for (const value of [null, [], {}, 'save', 0]) assert.ok(!saveBox.qa.validSave(value));
+for (const field of ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave']) {
+  for (const value of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '120', null])
+    assert.ok(!saveBox.qa.validSave({ ...valid, [field]: value }), `${field} accepts invalid ${value}`);
+  assert.ok(!saveBox.qa.validSave(Object.fromEntries(Object.entries(valid).filter(([key]) => key !== field))));
+}
+for (const field of ['castleLv', 'forgeLv', 'tavernLv']) assert.ok(!saveBox.qa.validSave({ ...valid, [field]: 0 }));
+console.log('PASS: save predicate rejects missing, fractional, negative, unsafe and wrong-type values. No storage mutations.');
+
+// Model the sound graph to check limits and cleanup, not sound quality or audibility.
+let liveVoices = 0, stopped = 0, disconnected = 0;
+const oscillators = [];
+class TestAudioContext {
+  constructor() { this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+  resume() { return Promise.resolve(); }
+  createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() { disconnected++; } }; }
+  createOscillator() {
+    liveVoices++;
+    const node = { frequency: { value: 0 }, connect() {}, disconnect() { disconnected++; liveVoices--; },
+      start() {}, stop() { stopped++; } };
+    oscillators.push(node); return node;
+  }
+}
+const audioBox = vm.createContext({ window: { AudioContext: TestAudioContext }, localStorage: { getItem() { return null; }, setItem() {} } });
+vm.runInContext(between(common, 'const AUDIO_KEY', 'export const BALL_TYPES').replaceAll('export ', '') + '\nglobalThis.qa={blip,setAudioMuted,setAudioPaused};', audioBox);
+for (let i = 0; i < 200; i++) audioBox.qa.blip();
+assert.equal(liveVoices, 16);
+audioBox.qa.blip(120, 0.2, 'sawtooth', 0.05, 1);
+assert.equal(liveVoices, 16);
+assert.equal(oscillators.length, 17); // high priority replaces one old routine voice
+assert.equal(disconnected, 2);
+audioBox.qa.setAudioPaused(true);
+assert.equal(liveVoices, 0);
+const count = oscillators.length;
+audioBox.qa.blip(); assert.equal(oscillators.length, count);
+audioBox.qa.setAudioPaused(false); audioBox.qa.setAudioMuted(true);
+audioBox.qa.blip(); assert.equal(oscillators.length, count);
+audioBox.qa.setAudioMuted(false); audioBox.qa.blip();
+assert.equal(liveVoices, 1);
+oscillators.at(-1).onended();
+assert.equal(liveVoices, 0);
+assert.equal(disconnected, oscillators.length * 2);
+assert.ok(stopped >= oscillators.length);
+console.log('PASS: modeled audio cap 16, priority replacement, pause/mute suppression and oscillator/gain cleanup. Not a listening test.');
