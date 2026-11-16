@@ -556,7 +556,8 @@ export async function startBattle(ctx) {
     if (S.fireMul > 0.7) passives.push({ kind: 'haste' });
     if (S.heroHP < 5) passives.push({ kind: 'life' });
     const pair = fusiblePairs();
-    const owned = S.inventory.filter(b => !b.evolved);
+    const basic = S.inventory.filter(b => !b.evolved);
+    const owned = basic.length ? basic : S.inventory; // 진화 공만 남아도 기존 강화 공식을 써서 성장 선택 유지
     let growth;
     if (pair) growth = { kind: 'fuse', pair };
     else if (owned.length) growth = { kind: 'up', ball: owned[Math.floor(Math.random() * owned.length)] };
@@ -1123,4 +1124,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+          }
