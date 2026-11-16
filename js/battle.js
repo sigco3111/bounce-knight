@@ -52,6 +52,7 @@ export async function startBattle(ctx) {
   renderer.toneMappingExposure = 1.45;
   scr.prepend(renderer.domElement);
   const canvas = renderer.domElement;
+  let renderDirty = true;
   canvas.style.touchAction = 'none';
 
   const scene = new THREE.Scene();
@@ -67,7 +68,7 @@ export async function startBattle(ctx) {
     camera.updateMatrixWorld(true);
   }
   const fitViewport = () => {
-    renderer.setSize(W(), VH()); frameCamera();
+    renderer.setSize(W(), VH()); frameCamera(); renderDirty = true;
     fitBossBar();
     document.getElementById('bt-hint').style.bottom = ((panel?.offsetHeight || 120) + 24) + 'px';
   };
@@ -708,14 +709,14 @@ export async function startBattle(ctx) {
   }
   canvas.addEventListener('webglcontextlost', onContextLost);
   canvas.addEventListener('webglcontextrestored', () => {
-    contextLost = false; contextGuard.classList.add('hidden');
+    contextLost = false; renderDirty = true; contextGuard.classList.add('hidden');
     if (S.phase === 'paused') resumeButton.focus({ preventScroll: true });
     else if (contextFocus?.isConnected) contextFocus.focus({ preventScroll: true });
     setAudioPaused(S.phase === 'paused');
   });
   function pauseBattle() {
     if (S.phase !== 'play') return;
-    S.phase = 'paused'; clearControls(); setAudioPaused(true);
+    S.phase = 'paused'; renderDirty = true; clearControls(); setAudioPaused(true);
     pausedAnimations = scr.getAnimations({ subtree: true }).filter(a => a.playState === 'running');
     for (const a of pausedAnimations) a.pause();
     pauseButton.disabled = true; pauseOverlay.classList.remove('hidden'); resumeButton.focus({ preventScroll: true });
@@ -997,7 +998,7 @@ export async function startBattle(ctx) {
   function loop(t) {
     if (S.over && S.phase === 'done') return;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
-    if (contextLost) { raf(loop); return; }
+    if (contextLost || (S.phase === 'paused' && !renderDirty)) { raf(loop); return; }
     if (S.phase === 'play') S.now += dt; // 선택/종료 화면에서는 전투 시계와 콤보를 멈춤
     if (S.phase === 'play' && S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
     for (let i = 0; i < sub; i++) step(dt);
@@ -1046,6 +1047,7 @@ export async function startBattle(ctx) {
       inv: S.inventory.map(b => b.type + b.lv + (b.evolved ? 'E' : '')),
     });
     if (!ctx.norender) renderer.render(scene, camera);
+    renderDirty = false;
     raf(loop);
   }
 
@@ -1085,4 +1087,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                            }
+                }
