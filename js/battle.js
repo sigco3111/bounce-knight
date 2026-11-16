@@ -683,11 +683,12 @@ export async function startBattle(ctx) {
   contextGuard.innerHTML = '<div class="ttl" id="context-title">화면 복구 대기</div><div class="dsc" style="text-align:center;line-height:1.8">전투를 멈췄습니다.<br>화면이 복구되면 이어갈 수 있습니다.</div>';
   scr.appendChild(contextGuard);
   contextGuard.addEventListener('keydown', e => { if (e.key === 'Tab') e.preventDefault(); });
-  canvas.addEventListener('webglcontextlost', e => {
-    e.preventDefault(); contextLost = true; contextFocus = document.activeElement;
+  function onContextLost(e) {
+    e?.preventDefault(); contextLost = true; contextFocus = document.activeElement;
     pauseBattle(); clearControls(); setAudioPaused(true);
     contextGuard.classList.remove('hidden'); contextGuard.focus({ preventScroll: true });
-  });
+  }
+  canvas.addEventListener('webglcontextlost', onContextLost);
   canvas.addEventListener('webglcontextrestored', () => {
     contextLost = false; contextGuard.classList.add('hidden');
     if (S.phase === 'paused') resumeButton.focus({ preventScroll: true });
@@ -1027,6 +1028,7 @@ export async function startBattle(ctx) {
   document.getElementById('bt-loading')?.classList.add('hidden'); // assets ready: reveal the battlefield
   updHud(); showAim();
   if (document.hidden) pauseBattle(); // assets may have finished after the user left
+  if (renderer.getContext().isContextLost()) onContextLost(); // context may have been lost while models were loading
   raf(loop);
 
   // input-path test hook: 왼쪽 드래그(이동) + 오른쪽 드래그(조준) 합성 이벤트를 실제 핸들러에 통과
@@ -1052,4 +1054,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                            }
+                                     }
