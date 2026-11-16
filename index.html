@@ -140,6 +140,14 @@
     .base-card .cost { white-space:nowrap; flex-shrink:0; }
     .go-wrap, .base-hint { left:56%; }
   }
+  @media (prefers-reduced-motion:reduce) {
+    #danger-line, #bt-loading { animation:none; opacity:1; }
+    #hit-flash.on, #fuse-flash.on, #boss-flash.on { animation:none; opacity:0; }
+    .popup, .popup.banner, .popup.warn, .popup.combo { animation-name:quietpop; }
+    #bt-bossbar .track i, .xp i { transition:none; }
+    .btn:active { transform:none; }
+  }
+  @keyframes quietpop { 0%,72%{opacity:1;margin-top:0} 100%{opacity:0;margin-top:0} }
   #state { position:absolute; left:-9999px; top:-9999px; }
 </style>
 <script>window.createImageBitmap = undefined;</script>
