@@ -613,6 +613,9 @@ export async function startBattle(ctx) {
         e.flash -= dt;
         const k = Math.max(0, e.flash / 0.14);
         for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(k > 0 ? 0xffffff : mt.userData._e); mt.emissiveIntensity = k > 0 ? 0.9 * k : mt.userData._ei; } }
+      } else { // 상태 이상을 적 본체 색으로 표시: 동결=얼음빛, 중독=녹색 기운 (타격 플래시가 우선)
+        const tint = e.frozen > 0 ? 0x2a6a9f : e.poison ? 0x2f7a1a : 0;
+        for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(tint || mt.userData._e); mt.emissiveIntensity = tint ? 0.55 : mt.userData._ei; } }
       }
       if (e.poison) { // 중독 지속 피해
         e.poison.t -= dt;
