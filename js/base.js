@@ -17,7 +17,9 @@ export async function startBase(ctx) {
 
   const CW = () => W() / H() > 1.2 ? Math.round(W() * 0.56) : W();
   let reflowLabels = () => {};
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+  catch (_) { const error = new Error('3D graphics initialization failed'); error.code = 'GRAPHICS_INIT_FAILED'; throw error; }
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.setSize(CW(), H());
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
