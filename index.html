@@ -32,7 +32,10 @@
     animation:pop .7s ease-out forwards; }
   .popup.gold { color:#ffe27a; font-size:13px; }
   .popup.banner { color:#ffe27a; font-size:21px; white-space:nowrap; animation:pop 1.4s ease-out forwards; }
-  .popup.warn { color:#ff5a4d; font-size:26px; }
+  .popup.warn { color:#ff5a4d; font-size:32px; animation:pop 1.6s ease-out forwards; }
+  #hit-flash { position:absolute; inset:0; z-index:7; pointer-events:none; opacity:0; box-shadow:inset 0 0 120px 46px rgba(255,42,30,.6); }
+  #hit-flash.on { animation:hitflash .5s ease-out; }
+  @keyframes hitflash { 0%{opacity:1} 100%{opacity:0} }
   #legacy-save { position:absolute; top:76px; left:16px; right:16px; z-index:8; background:rgba(20,26,44,.96); border:1px solid #f0a45a; border-radius:10px; padding:10px 12px; font-size:13px; color:#e8e2f5; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   #legacy-save button { background:#e05a3a; color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:700; cursor:pointer; }
   #legacy-save #legacy-no { background:#3a4260; }
