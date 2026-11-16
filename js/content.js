@@ -38,3 +38,12 @@ export function applyEventChoice(state, choice, maxHP) {
   if (choice.upgrade && state.inventory[0]) state.inventory[0].lv++;
   return true;
 }
+
+export const KNIGHTS = [
+  { id: 'guardian', name: '수호 기사', short: '수호', color: 0xffcf79, desc: '철구 3개 시작 · 첫 피격 피해 1 방어', start: ['iron','iron','iron'], speed: 1, status: 1 },
+  { id: 'ranger', name: '유성 기사', short: '유성', color: 0xf3b5dd, desc: '관통구+철구 2개 시작 · 공 속도 +20%', start: ['pierce','iron','iron'], speed: 1.2, status: 1, unlock: 'dungeon' },
+  { id: 'alchemist', name: '연금 기사', short: '연금', color: 0x8ce5ab, desc: '독구+빙결구+철구 시작 · 독/빙결 지속시간 +30%', start: ['poison','ice','iron'], speed: 1, status: 1.3, unlock: 'ruins' },
+];
+export const knightOpen = (save, knight) => !knight.unlock || (save.clearedRegions || []).includes(knight.unlock);
+export const selectedKnight = save => KNIGHTS.find(k => k.id === save.selectedKnight && knightOpen(save, k)) || KNIGHTS[0];
+export const validKnight = value => value === undefined || KNIGHTS.some(k => k.id === value);
