@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadModel, HtmlLabels, popup, blip, BALL_TYPES, ballName, ballDmg } from './common.js';
+import { loadModel, HtmlLabels, popup, blip, BALL_TYPES, EVOLVED, ballName, ballDmg } from './common.js';
 
 // 실시간 전투 (원작 BALL x PIT 리듬):
 // - 영웅이 전장 아래를 자유롭게 이동, 공은 자동 연사 스트림(인벤토리만큼 동시 비행)
@@ -302,7 +302,7 @@ export async function startBattle(ctx) {
       if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc; }
       else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = '피해량이 오른다.'; }
       else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = '모든 공 피해량 +20%'; }
-      else { ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2'; t2 = '두 공을 합쳐 상위 공으로 진화시킨다.'; }
+      else { ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + c.pair[0].lv; t2 = '두 공을 합쳐 상위 공으로 진화시킨다.'; }
       const d = document.createElement('div');
       d.className = 'card-pick';
       d.innerHTML = `<div class="ic" style="background:${ic}"></div><div><div class="t1">${t1}</div><div class="t2">${t2}</div></div>`;
@@ -325,7 +325,9 @@ export async function startBattle(ctx) {
     else if (c.kind === 'mul') S.dmgMul += 0.2;
     else if (c.kind === 'fuse') {
       S.inventory = S.inventory.filter(b => b !== c.pair[0] && b !== c.pair[1]);
-      S.inventory.push({ type: c.pair[0].type, lv: 1, evolved: true });
+      const nb = { type: c.pair[0].type, lv: c.pair[0].lv, evolved: true }; // fusion keeps the pair's level: evolving always feels like an upgrade
+      S.inventory.push(nb);
+      if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.3, `융합! ${ballName(nb)} 탄생`, 'banner');
       blip(660, 0.1, 'triangle', 0.05);
       setTimeout(() => blip(990, 0.16, 'triangle', 0.05), 100);
     }
@@ -591,4 +593,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-          }
+}
