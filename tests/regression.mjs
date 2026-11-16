@@ -219,3 +219,24 @@ vm.runInContext(tick,fxBox);assert.equal(deaths,1000);assert.equal(fxCalls,1);vm
 vm.runInContext(tick,fxBox);assert.equal(deaths,1002);assert.equal(fxCalls,2);
 console.log('PASS exact FX tick: 1000 simultaneous expirations, stable live entries, one disposal each, shared geometry untouched, delayed effects once. Not a GPU-memory benchmark.');
 }
+
+// A denied asynchronous audio resume must not become an unhandled rejection.
+{
+  const rejections = [];
+  const onRejected = reason => rejections.push(reason);
+  process.on('unhandledRejection', onRejected);
+  try {
+    class RefusedAudioContext extends TestAudioContext {
+      constructor() { super(); this.state = 'suspended'; }
+      resume() { return Promise.reject(new Error('modeled audio permission denied')); }
+    }
+    const deniedAudio = vm.createContext({ window: { AudioContext: RefusedAudioContext }, localStorage: { getItem() { return null; }, setItem() {} } });
+    vm.runInContext(between(common, 'const AUDIO_KEY', 'export const BALL_TYPES').replaceAll('export ', '') + '\nglobalThis.qa={blip,setAudioPaused};', deniedAudio);
+    for (let i = 0; i < 10; i++) deniedAudio.qa.blip();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(rejections.length, 0);
+    deniedAudio.qa.setAudioPaused(true);
+    assert.equal(liveVoices, 0);
+  } finally { process.off('unhandledRejection', onRejected); }
+  console.log('PASS: denied modeled audio resumes do not leak asynchronous errors. Not a device permission or listening test.');
+}
