@@ -160,7 +160,7 @@ export async function startBattle(ctx) {
   // ---- enemies ----
   async function spawnEnemy(type, x, z) {
     const def = ENEMY_DEFS[type];
-    const m = await loadModel(def.u, { s: def.s, x, z, clone: true, poseT: Math.random() });
+    const m = await loadModel(def.u, { s: def.s, x, z, clone: true, poseT: Math.random(), animate: !ctx.norender, animation: 'Walking_D_Skeletons' });
     scene.add(m.obj);
     // per-enemy cloned materials so a hit flash never bleeds onto other enemies
     const mats = [], seen = new Map();
@@ -171,7 +171,7 @@ export async function startBattle(ctx) {
       }
     });
     const hp = def.hp(S.wave);
-    const e = { id: S.nextId++, type, def, obj: m.obj, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
+    const e = { id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
     S.enemies.push(e);
     return e;
@@ -377,6 +377,7 @@ export async function startBattle(ctx) {
   }
   function rmvEnemy(e) {
     scene.remove(e.obj);
+    if (e.mixer) { e.mixer.stopAllAction(); e.mixer.uncacheRoot(e.obj); e.mixer = null; }
     if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; }
     for (const mat of e.mats || []) mat.dispose(); // 적별 복제 재질만 해제. 공유 모델 지오메트리/텍스처는 유지
     e.mats = [];
@@ -746,6 +747,7 @@ export async function startBattle(ctx) {
         if (e.poison.t <= 0) e.poison = null;
       }
       if (e.frozen > 0) { e.frozen -= dt; continue; }
+      if (e.mixer) e.mixer.update(dt * (e.type === 'boss' ? 0.4 : e.def.spd * 0.65));
       e.z += MARCH_SPEED * e.def.spd * dt;
       if (!e.warned && e.z > 1.2) { // attack telegraph: enemy about to breach
         e.warned = true;
@@ -869,4 +871,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+        }
