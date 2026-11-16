@@ -547,6 +547,7 @@ export async function startBattle(ctx) {
     if (!hintGone) { hintGone = true; document.getElementById('bt-hint')?.classList.add('hidden'); } // 첫 조작 후 안내 숨김: 영웅/필드를 가리지 않게
     const half = e.clientX < window.innerWidth / 2 ? 'move' : 'aim';
     touches[half] = e.pointerId;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* 합성 테스트에는 활성 포인터가 없을 수 있음 */ }
     if (half === 'move') S.moveTarget = groundPoint(e);
     else S.aimDir = aimFromPoint(groundPoint(e));
   });
@@ -561,6 +562,7 @@ export async function startBattle(ctx) {
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('lostpointercapture', release); // 캔버스 밖에서 놓거나 포인터 소유권을 잃어도 이동 상태 정리
 
   // ---- auto pilot (검증 전용): 젬 추적 이동 + 최전방 적 조준, 같은 상태 경로 사용 ----
   function autoPilot() {
@@ -833,4 +835,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-          }
+}
