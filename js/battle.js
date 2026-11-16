@@ -253,9 +253,10 @@ export async function startBattle(ctx) {
     updHud();
   }
   function delayFx(seconds, run) { S.fxQueue.push({ remaining: seconds, run }); }
+  const impactRingGeo = new THREE.RingGeometry(0.62, 0.78, 40); // same silhouette shared by every short-lived ring
   function ring(x, z, color, maxR = 1.1, ttl = 0.4) { // local impact ring at the hit point
     if (ctx.norender) return;
-    const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color, toneMapped: false, fog: false, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const m = new THREE.Mesh(impactRingGeo, new THREE.MeshBasicMaterial({ color, toneMapped: false, fog: false, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.12, z);
     m.scale.setScalar(0.01); // 첫 프레임도 작은 반경으로 시작해 다음 프레임 수축 깜박임을 막음
@@ -790,7 +791,7 @@ export async function startBattle(ctx) {
       const k = Math.max(0, 1 - r.t / r.ttl);
       r.mesh.scale.setScalar(Math.max(0.01, r.maxR * (1 - k * k))); // ease-out expand
       r.mesh.material.opacity = k * 0.9;
-      if (r.t >= r.ttl) { scene.remove(r.mesh); r.mesh.material.dispose(); r.mesh.geometry.dispose(); S.rings = S.rings.filter(q => q !== r); }
+      if (r.t >= r.ttl) { scene.remove(r.mesh); r.mesh.material.dispose(); S.rings = S.rings.filter(q => q !== r); }
     }
     // balls
     for (const b of [...S.balls]) {
