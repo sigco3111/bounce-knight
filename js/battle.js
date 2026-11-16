@@ -17,7 +17,7 @@ const BALL_R = 0.2;
 const ENEMY_R = 0.42;
 const SPEED = 10;
 const FIRE_INTERVAL = 0.5;
-const TRAIL_N = 7;
+const TRAIL_N = 12;
 const SPAWN_INTERVAL = 6.5;
 const MARCH_SPEED = 0.32;  // 초당 전진
 
@@ -239,7 +239,7 @@ export async function startBattle(ctx) {
       const tg = new THREE.BufferGeometry();
       tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
       tg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
-      trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending, depthWrite: false }));
+      trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
       trail.frustumCulled = false;
       scene.add(trail);
     }
