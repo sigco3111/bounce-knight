@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg } from './common.js';
+import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg, ballReaction } from './common.js';
 
 // 실시간 전투 (원작 BALL x PIT 리듬):
 // - 영웅이 전장 아래를 자유롭게 이동, 공은 자동 연사 스트림(인벤토리만큼 동시 비행)
@@ -201,7 +201,7 @@ export async function startBattle(ctx) {
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
-    combo: 0, comboT: -99,
+    combo: 0, comboT: -99, reactions: 0,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -425,6 +425,19 @@ export async function startBattle(ctx) {
   }
 
   function damageEnemy(e, dmg, src) {
+    const reaction = ballReaction(src.def, e);
+    if (reaction) {
+      e.hp -= reaction.damage; S.reactions++;
+      if (reaction.kind === 'shatter') {
+        e.frozen = 0;
+        if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; }
+      } else e.poison = null;
+      if (!ctx.norender) {
+        const p = proj(new THREE.Vector3(e.x, e.h + 0.65, e.z));
+        popup(labelsC, p.x, p.y, (reaction.kind === 'shatter' ? '쇄빙' : '독 점화') + ' +' + reaction.damage);
+        ring(e.x, e.z, reaction.kind === 'shatter' ? 0x9fd8ff : 0xff7a1f, 1, 0.3);
+      }
+    }
     e.hp -= dmg;
     e.flash = 0.14;
     for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(0xffffff); mt.emissiveIntensity = 0.9; } }
@@ -455,6 +468,7 @@ export async function startBattle(ctx) {
     }
     updEnemyLabel(e);
     updBossBar();
+    if (reaction) updHud();
     for (const o of [...S.enemies]) if (o.hp <= 0) killEnemy(o, BALL_TYPES[src.def.type].color);
   }
   function updBossBar() { // 미니보스 전용 상단 체력바: 보스가 살아있는 동안만 표시
@@ -654,6 +668,7 @@ export async function startBattle(ctx) {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
     document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave) + (bossAlive ? ' · 보스' : '');
     const pb = [];
+    if (S.reactions) pb.push('연계 ' + S.reactions);
     if (S.dmgMul > 1) pb.push('공격+' + Math.round((S.dmgMul - 1) * 100) + '%');
     if (S.fireMul < 1) pb.push('연사x' + Math.round(Math.log(S.fireMul) / Math.log(0.85)));
     document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 연속x${S.combo}` : '') + (pb.length ? ' · ' + pb.join(' · ') : '');
@@ -1086,7 +1101,7 @@ export async function startBattle(ctx) {
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
       aim: Math.round(S.aimDir * 100) / 100,
-      evolvedHits: S.evolvedHits, lastEvolvedDmg: S.lastEvolvedDmg, fireMul: Math.round(S.fireMul * 1000) / 1000,
+      reactions: S.reactions, evolvedHits: S.evolvedHits, lastEvolvedDmg: S.lastEvolvedDmg, fireMul: Math.round(S.fireMul * 1000) / 1000,
       inv: S.inventory.map(b => b.type + b.lv + (b.evolved ? 'E' : '')),
     });
     if (!ctx.norender) renderer.render(scene, camera);
@@ -1130,4 +1145,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+      }
