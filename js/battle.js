@@ -813,8 +813,9 @@ export async function startBattle(ctx) {
     const dueFx = [];
     S.fxQueue = S.fxQueue.filter(fx => { fx.remaining -= dt; if (fx.remaining > 0) return true; dueFx.push(fx); return false; });
     for (const fx of dueFx) fx.run();
-    // fx particles
-    for (const p of [...S.parts]) {
+    // Compact once in place: a burst can expire hundreds of materials in one frame.
+    let liveParts = 0;
+    for (const p of S.parts) {
       p.t += dt;
       p.mesh.position.x += p.vx * dt; p.mesh.position.z += p.vz * dt;
       p.mesh.position.y = Math.max(0.06, p.mesh.position.y + p.vy * dt);
@@ -823,16 +824,21 @@ export async function startBattle(ctx) {
       const k = Math.max(0, 1 - p.t / p.ttl);
       p.mesh.material.opacity = k;
       p.mesh.scale.setScalar(Math.max(0.05, k * (p.sc || 1)));
-      if (p.t >= p.ttl) { scene.remove(p.mesh); p.mesh.material.dispose(); S.parts = S.parts.filter(q => q !== p); }
+      if (p.t >= p.ttl) { scene.remove(p.mesh); p.mesh.material.dispose(); }
+      else S.parts[liveParts++] = p;
     }
+    S.parts.length = liveParts;
     // impact rings
-    for (const r of [...S.rings]) {
+    let liveRings = 0;
+    for (const r of S.rings) {
       r.t += dt;
       const k = Math.max(0, 1 - r.t / r.ttl);
       r.mesh.scale.setScalar(Math.max(0.01, r.maxR * (1 - k * k))); // ease-out expand
       r.mesh.material.opacity = k * 0.9;
-      if (r.t >= r.ttl) { scene.remove(r.mesh); r.mesh.material.dispose(); S.rings = S.rings.filter(q => q !== r); }
+      if (r.t >= r.ttl) { scene.remove(r.mesh); r.mesh.material.dispose(); }
+      else S.rings[liveRings++] = r;
     }
+    S.rings.length = liveRings;
     // balls
     for (const b of [...S.balls]) {
       b.x += b.vx * dt; b.z += b.vz * dt;
@@ -1087,4 +1093,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                }
+}
