@@ -251,7 +251,7 @@ export async function startBattle(ctx) {
     const hp = def.hp(S.wave);
     const e = { id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
-    S.enemies.push(e);
+    S.enemies.push(e); renderDirty = true; // async model completion may land while a dialog holds the view
     return e;
   }
   function updEnemyLabel(e) {
@@ -1118,4 +1118,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+                                                          }
