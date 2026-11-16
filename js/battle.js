@@ -226,6 +226,7 @@ export async function startBattle(ctx) {
     if (advance && w % 5 === 0 && w % 10 !== 0) milestone(w); // boss waves pay on boss kill instead
     if (advance && w % 10 === 0) { // miniboss wave: single heavy hitter, gates the wave counter until killed
       await spawnEnemy('boss', 0, -6.9);
+      updBossBar();
       if (!ctx.norender) {
         popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
         bossFlash.classList.remove('on'); void bossFlash.offsetWidth; bossFlash.classList.add('on');
@@ -328,12 +329,22 @@ export async function startBattle(ctx) {
       }
     }
     updEnemyLabel(e);
+    updBossBar();
     for (const o of [...S.enemies]) if (o.hp <= 0) killEnemy(o);
+  }
+  function updBossBar() { // 미니보스 전용 상단 체력바: 보스가 살아있는 동안만 표시
+    const el = document.getElementById('bt-bossbar');
+    if (!el) return;
+    const boss = S.enemies.find(o => o.type === 'boss');
+    if (!boss) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
   }
   function killEnemy(e) {
     S.enemies = S.enemies.filter(x => x !== e);
     scene.remove(e.obj); labels.remove(e.label);
     S.kills++;
+    if (e.type === 'boss') updBossBar();
     const bsc = e.type === 'boss' ? 1.7 : 1;
     burst(e.x, e.z, 0xffd76a, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
     burst(e.x, e.z, 0xfff6dd, e.type === 'boss' ? 8 : 5, 2.5, 0.9, { sc: bsc });
