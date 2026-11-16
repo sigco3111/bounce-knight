@@ -254,6 +254,7 @@ export async function startBattle(ctx) {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.12, z);
+    m.scale.setScalar(0.01); // 첫 프레임도 작은 반경으로 시작해 다음 프레임 수축 깜박임을 막음
     scene.add(m);
     S.rings.push({ mesh: m, t: 0, ttl, maxR });
   }
@@ -866,7 +867,7 @@ export async function startBattle(ctx) {
       }
       if (d < 0.8) {
         S.xp++; S.gemsGot++;
-        ring(S.heroX, S.heroZ, 0x53e0ff, 0.55, 0.24);
+        ring(S.heroX, S.heroZ, 0x53e0ff, 0.95, 0.32);
         scene.remove(g.mesh); S.gems = S.gems.filter(x => x !== g);
         blip(990, 0.06, 'sine', 0.03);
         updHud();
