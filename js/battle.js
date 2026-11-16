@@ -493,8 +493,8 @@ export async function startBattle(ctx) {
     hitFlash.classList.remove('on'); void hitFlash.offsetWidth; hitFlash.classList.add('on');
     const p = proj(new THREE.Vector3(ex != null ? ex : S.heroX, 1.0, ez != null ? ez : S.heroZ));
     popup(labelsC, p.x, p.y, '-' + dmg + ' HP');
-    blip(120, 0.2, 'sawtooth', 0.05);
-    setTimeout(() => blip(90, 0.22, 'sawtooth', 0.045), 70);
+    blip(120, 0.2, 'sawtooth', 0.05, 1);
+    setTimeout(() => blip(90, 0.22, 'sawtooth', 0.045, 1), 70);
     updHud();
     if (S.heroHP <= 0) gameOver();
   }
@@ -599,8 +599,8 @@ export async function startBattle(ctx) {
   function gameOver() {
     if (S.over) return;
     S.over = true; S.phase = 'over'; clearControls();
-    blip(200, 0.3, 'sawtooth', 0.055);
-    setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05), 170);
+    blip(200, 0.3, 'sawtooth', 0.055, 1);
+    setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05, 1), 170);
     document.getElementById('over-dsc').textContent = `도달 웨이브 ${S.wave} · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
     document.getElementById('ov-over').classList.remove('hidden');
     document.getElementById('btn-tobase').focus({ preventScroll: true });
@@ -1068,4 +1068,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+                             }
