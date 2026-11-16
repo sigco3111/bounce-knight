@@ -435,22 +435,24 @@ export async function startBattle(ctx) {
   }
   function levelUp() {
     S.phase = 'levelup'; S.level++;
-    const pool = [];
-    pool.push({ kind: 'new', type: ['fire', 'ice', 'bolt', 'poison'][Math.floor(Math.random() * 4)] });
-    const owned = S.inventory.filter(b => !b.evolved);
-    if (owned.length) { const b = owned[Math.floor(Math.random() * owned.length)]; pool.push({ kind: 'up', ball: b }); }
-    pool.push({ kind: 'mul' });
-    if (S.fireMul > 0.7) pool.push({ kind: 'haste' });
-    if (S.heroHP < 5) pool.push({ kind: 'life' });
-    const pair = fusiblePairs();
-    if (pair) pool.push({ kind: 'fuse', pair });
-    const picks = [];
-    const fuseCard = pool.findIndex(c => c.kind === 'fuse');
-    if (fuseCard >= 0) picks.push(pool.splice(fuseCard, 1)[0]); // 융합 가능 시 항상 제시
-    while (picks.length < Math.min(3, pool.length + picks.length) && pool.length) {
-      const c = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-      picks.push(c);
+    // 네 장: 서로 다른 새 공 2종 / 융합 우선 또는 강화 / 패시브
+    const elements = ['fire', 'ice', 'bolt', 'poison'];
+    for (let i = elements.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [elements[i], elements[j]] = [elements[j], elements[i]];
     }
+    const picks = elements.slice(0, 2).map(type => ({ kind: 'new', type }));
+    const passives = [{ kind: 'mul' }];
+    if (S.fireMul > 0.7) passives.push({ kind: 'haste' });
+    if (S.heroHP < 5) passives.push({ kind: 'life' });
+    const pair = fusiblePairs();
+    const owned = S.inventory.filter(b => !b.evolved);
+    let growth;
+    if (pair) growth = { kind: 'fuse', pair };
+    else if (owned.length) growth = { kind: 'up', ball: owned[Math.floor(Math.random() * owned.length)] };
+    else if (passives.length > 1) growth = passives.splice(1 + Math.floor(Math.random() * (passives.length - 1)), 1)[0];
+    else growth = { kind: 'new', type: elements[2] }; // 강화/추가 패시브가 없으면 중복 없는 세 번째 속성
+    picks.push(growth, passives[Math.floor(Math.random() * passives.length)]);
     const cards = document.getElementById('lv-cards');
     cards.innerHTML = '';
     for (const c of picks) {
@@ -464,8 +466,10 @@ export async function startBattle(ctx) {
       else { const flv = c.pair[0].lv; ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + flv; t2 = EVOLVED[c.pair[0].type].desc + ` 기본 적중 피해 ${ballDmg({ lv: flv, evolved: true })} (기존 각 ${flv}) · 공 2개 → 1개`; }
       const d = document.createElement('div');
       d.className = 'card-pick';
+      d.dataset.kind = c.kind;
+      if (c.type) d.dataset.type = c.type;
       d.innerHTML = `<div class="ic" style="background:${ic}"></div><div><div class="t1">${t1}</div><div class="t2">${t2}</div></div>`;
-      d.onclick = () => { applyCard(c); document.getElementById('ov-levelup').classList.add('hidden'); afterLevelUp(); };
+      d.onclick = () => { if (S.phase !== 'levelup') return; applyCard(c); document.getElementById('ov-levelup').classList.add('hidden'); afterLevelUp(); };
       cards.appendChild(d);
     }
     document.getElementById('bt-lv').textContent = 'Lv.' + S.level;
@@ -836,4 +840,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                                                                                                       }
+                     }
