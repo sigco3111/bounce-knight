@@ -1,6 +1,6 @@
 import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice } from './content.js';
 import * as THREE from 'three';
-import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
+import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, BASE_ELEMENTS, crossFusion, ballHas, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
 // 실시간 전투 (원작 BALL x PIT 리듬):
 // - 영웅이 전장 아래를 자유롭게 이동, 공은 자동 연사 스트림(인벤토리만큼 동시 비행)
@@ -337,7 +337,7 @@ export async function startBattle(ctx) {
     else if (def.type === 'ice') ring(e.x, e.z, 0x9fd8ff, ev ? 1.2 : 0.9, 0.5);
     else if (def.type === 'bolt') ring(e.x, e.z, 0xffe14d, ev ? 1.0 : 0.75, 0.24);
     else if (def.type === 'poison') ring(e.x, e.z, 0x7ddc3f, ev ? 1.3 : 1.0, 0.5);
-    else ring(e.x, e.z, 0xdde7f2, ev ? 0.9 : 0.7, 0.3);
+    else ring(e.x, e.z, BALL_TYPES[def.type].color, ev ? 0.9 : 0.7, 0.3);
     if (def.type === 'fire') { // 폭발형: 크고 높이 솟는 화염 파편 + 잔불
       burst(e.x, e.z, 0xff7a1f, ev ? 16 : 11, ev ? 5.2 : 4.0, y, { vy0: 3, vyR: 3.5, ttl0: 0.6, ttlR: 0.3, sc: ev ? 1.5 : 1.15 });
       burst(e.x, e.z, 0xff3d00, ev ? 8 : 5, ev ? 3.2 : 2.4, y, { vy0: 1.6, vyR: 2, ttl0: 0.8, ttlR: 0.3, sc: 0.75 });
@@ -351,7 +351,7 @@ export async function startBattle(ctx) {
       burst(e.x, e.z, 0x7ddc3f, ev ? 13 : 9, ev ? 2.2 : 1.7, y, { vy0: 0.8, vyR: 1.1, ttl0: 0.7, ttlR: 0.3, sc: ev ? 1.25 : 1 });
       burst(e.x, e.z, 0xd6ffb0, 4, 1.2, y, { vy0: 1.4, vyR: 0.8, ttl0: 0.45, ttlR: 0.2, sc: 0.6 });
     } else { // iron: 묵직한 금속 파편
-      burst(e.x, e.z, 0xdde7f2, ev ? 14 : 9, ev ? 4.8 : 3.6, y, { vy0: 2, vyR: 2.5, ttl0: 0.45, ttlR: 0.15, sc: ev ? 1.4 : 1 });
+      burst(e.x, e.z, BALL_TYPES[def.type].color, ev ? 14 : 9, ev ? 4.8 : 3.6, y, { vy0: 2, vyR: 2.5, ttl0: 0.45, ttlR: 0.15, sc: ev ? 1.4 : 1 });
     }
   }
   async function spawnRow(advance) {
@@ -570,17 +570,17 @@ export async function startBattle(ctx) {
     const th = { fire: [170, 'square', 0.05], ice: [560, 'sine', 0.05], bolt: [980, 'sawtooth', 0.03], iron: [220, 'square', 0.04], poison: [340, 'triangle', 0.045] }[src.def.type] || [220, 'square', 0.04];
     blip(th[0] + Math.random() * 50, th[2], th[1], 0.025); // per-type hit timbre
     typeHitBurst(src.def, e);
-    if (src.def.type === 'fire') {
+    if (ballHas(src.def, 'fire')) {
       const rad = src.def.evolved ? 1.4 : 0.95, sd = Math.max(1, Math.ceil(dmg / 2));
       for (const o of S.enemies) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < rad) { o.hp -= sd; updEnemyLabel(o); }
-    } else if (src.def.type === 'ice') {
+    } else if (ballHas(src.def, 'ice')) {
       e.frozen = src.def.evolved ? 3 : 1.5;
-    } else if (src.def.type === 'poison') {
+    } else if (ballHas(src.def, 'poison')) {
       const dur = src.def.evolved ? 4 : 2.5, tot = ballDmg(src.def) * (src.def.evolved ? 2.5 : 1);
       const dps = tot / dur; // 지속 피해: 총량은 공 위력 비례, 진화 시 더 오래 더 강하게
       if (!e.poison || e.poison.dps <= dps) e.poison = { dps, t: dur, acc: 0 };
       else e.poison.t = Math.max(e.poison.t, dur);
-    } else if (src.def.type === 'bolt') {
+    } else if (ballHas(src.def, 'bolt')) {
       const nChain = src.def.evolved ? 3 : 1;
       const others = S.enemies.filter(o => o !== e).sort((a, b) => Math.hypot(a.x - e.x, a.z - e.z) - Math.hypot(b.x - e.x, b.z - e.z));
       for (const o of others.slice(0, nChain)) if (Math.hypot(o.x - e.x, o.z - e.z) < 2.2) {
@@ -589,6 +589,22 @@ export async function startBattle(ctx) {
         burst(o.x, o.z, 0xffe14d, 5, 3.2, Math.max(0.4, (o.h || 1) * 0.6), { vy0: 1.2, vyR: 1.2, ttl0: 0.26, ttlR: 0.1, sc: 0.7 });
         updEnemyLabel(o);
       }
+    }
+    if (ballHas(src.def, 'wind')) {
+      e.z = Math.max(BACK + 0.8, e.z - (src.def.evolved ? 0.85 : 0.45)); e.obj.position.z = e.z;
+      ring(e.x, e.z, 0x74edcc, 1.1, 0.3);
+    }
+    if (ballHas(src.def, 'gravity')) {
+      const radius = src.def.evolved ? 2.7 : 2;
+      for (const o of S.enemies) if (o !== e) {
+        const dx = e.x - o.x, dz = e.z - o.z, d = Math.hypot(dx, dz);
+        if (d > 0.05 && d < radius) {
+          const n = Math.min(d * 0.5, src.def.evolved ? 0.75 : 0.4);
+          o.x = Math.max(-2.4, Math.min(2.4, o.x + dx / d * n)); o.z += dz / d * n;
+          o.originX = o.x; o.obj.position.set(o.x, o.obj.position.y, o.z);
+        }
+      }
+      ring(e.x, e.z, 0xb38aff, radius, 0.4);
     }
     updEnemyLabel(e);
     updBossBar();
@@ -712,7 +728,7 @@ export async function startBattle(ctx) {
   function fusiblePairs() {
     const seen = {};
     for (const b of S.inventory) {
-      if (b.evolved) continue; // 진화 완료 공은 재융합해도 피해가 늘지 않으므로 후보에서 제외
+      if (b.evolved || b.hybrid) continue; // 진화 완료 공은 재융합해도 피해가 늘지 않으므로 후보에서 제외
       const k = b.type + ':' + b.lv + ':' + b.evolved;
       if (seen[k]) return [seen[k], b];
       seen[k] = b;
@@ -722,7 +738,7 @@ export async function startBattle(ctx) {
   function levelUp() {
     S.phase = 'levelup'; scr.classList.add('choice-dialog-open'); clearControls(); S.level++;
     // 네 장: 서로 다른 새 공 2종 / 융합 우선 또는 강화 / 패시브
-    const elements = ['fire', 'ice', 'bolt', 'poison'];
+    const elements = [...BASE_ELEMENTS];
     for (let i = elements.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [elements[i], elements[j]] = [elements[j], elements[i]];
@@ -731,11 +747,12 @@ export async function startBattle(ctx) {
     const passives = [{ kind: 'mul' }];
     if (S.fireMul > 0.7) passives.push({ kind: 'haste' });
     if (S.heroHP < 5) passives.push({ kind: 'life' });
-    const pair = fusiblePairs();
+    const pair = fusiblePairs(), cross = crossFusion(S.inventory);
     const basic = S.inventory.filter(b => !b.evolved);
     const owned = basic.length ? basic : S.inventory; // 진화 공만 남아도 기존 강화 공식을 써서 성장 선택 유지
     let growth;
-    if (pair) growth = { kind: 'fuse', pair };
+    if (pair && (!cross || S.level % 2 === 0)) growth = { kind: 'fuse', pair };
+    else if (cross) growth = { kind: 'cross', ...cross };
     else if (owned.length) growth = { kind: 'up', ball: owned[Math.floor(Math.random() * owned.length)] };
     else if (passives.length > 1) growth = passives.splice(1 + Math.floor(Math.random() * (passives.length - 1)), 1)[0];
     else growth = { kind: 'new', type: elements[2] }; // 강화/추가 패시브가 없으면 중복 없는 세 번째 속성
@@ -746,10 +763,11 @@ export async function startBattle(ctx) {
       let ic, t1, t2;
       // 선택지 카드에 결과 수치를 미리 보여줘 비교 선택이 되게 (batch 17)
       if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc + ` 기본 적중 피해 ${ballDmg({ lv: 1, evolved: false })}`; }
-      else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = `기본 적중 피해 ${ballDmg(c.ball)} → ${ballDmg({ lv: c.ball.lv + 1, evolved: c.ball.evolved })}`; }
+      else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = `기본 적중 피해 ${ballDmg(c.ball)} → ${ballDmg({ lv: c.ball.lv + 1, evolved: c.ball.evolved, hybrid: c.ball.hybrid })}`; }
       else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = `직격 ×${S.dmgMul.toFixed(1)} → ×${(S.dmgMul + 0.2).toFixed(1)} · 독/연쇄 피해 제외`; }
       else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = `발사 주기 ${(FIRE_INTERVAL * S.fireMul).toFixed(2)}초 → ${(FIRE_INTERVAL * S.fireMul * 0.85).toFixed(2)}초 (최대 3회 중첩)`; }
       else if (c.kind === 'life') { ic = '#ff7a9d'; t1 = '패시브: 수호 심장'; t2 = `HP ${S.heroHP} → ${Math.min(5, S.heroHP + 1)} (최대 5)`; }
+      else if (c.kind === 'cross') { ic = BALL_TYPES[c.type].css; t1 = '이종 융합: ' + BALL_TYPES[c.type].name + ' Lv.' + c.lv; t2 = c.pair.map(ballName).join(' + ') + ' → 공 1개 · ' + BALL_TYPES[c.type].desc + ` 기본 적중 ${ballDmg({ lv: c.lv, hybrid: true })} · 두 공 중 낮은 레벨 유지`; }
       else { const flv = c.pair[0].lv; ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + flv; t2 = EVOLVED[c.pair[0].type].desc + ` 기본 적중 피해 ${ballDmg({ lv: flv, evolved: true })} (기존 각 ${flv}) · 공 2개 → 1개`; }
       const d = document.createElement('button');
       d.type = 'button';
@@ -778,6 +796,12 @@ export async function startBattle(ctx) {
     else if (c.kind === 'mul') S.dmgMul += 0.2;
     else if (c.kind === 'haste') S.fireMul *= 0.85;
     else if (c.kind === 'life') S.heroHP = Math.min(5, S.heroHP + 1);
+    else if (c.kind === 'cross') {
+      S.inventory = S.inventory.filter(b => !c.pair.includes(b));
+      S.inventory.push({ type: c.type, lv: c.lv, evolved: false, hybrid: true });
+      fusionFx(c.type, S.heroX, S.heroZ - 0.8);
+      if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.3, `이종 융합! ${BALL_TYPES[c.type].name}`, 'banner');
+    }
     else if (c.kind === 'fuse') {
       S.inventory = S.inventory.filter(b => b !== c.pair[0] && b !== c.pair[1]);
       const nb = { type: c.pair[0].type, lv: c.pair[0].lv, evolved: true }; // fusion keeps the pair's level: evolving always feels like an upgrade
@@ -1065,12 +1089,15 @@ export async function startBattle(ctx) {
         const dx = b.x - e.x, dz = b.z - e.z, d = Math.hypot(dx, dz), rs = BALL_R + ENEMY_R;
         if (d < rs) {
           const last = b.lastHit.get(e.id) || -9;
-          if (S.now - last < 0.18) continue;
+          const piercing = ballHas(b.def, 'pierce');
+          if ((piercing && b.lastHit.has(e.id)) || S.now - last < 0.18) continue;
           b.lastHit.set(e.id, S.now);
           const nx = dx / (d || 1), nz = dz / (d || 1);
           const dot = b.vx * nx + b.vz * nz;
-          b.vx -= 2 * dot * nx; b.vz -= 2 * dot * nz;
-          b.x = e.x + nx * (rs + 0.01); b.z = e.z + nz * (rs + 0.01);
+          if (!piercing) {
+            b.vx -= 2 * dot * nx; b.vz -= 2 * dot * nz;
+            b.x = e.x + nx * (rs + 0.01); b.z = e.z + nz * (rs + 0.01);
+          }
           S.hits++;
           const dmg = Math.max(1, Math.round(ballDmg(b.def) * S.dmgMul));
           damageEnemy(e, dmg, b);
@@ -1321,4 +1348,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                       }
+                           }
