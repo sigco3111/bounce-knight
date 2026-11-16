@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg, ballReaction } from './common.js';
+import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
 // 실시간 전투 (원작 BALL x PIT 리듬):
 // - 영웅이 전장 아래를 자유롭게 이동, 공은 자동 연사 스트림(인벤토리만큼 동시 비행)
@@ -696,6 +696,11 @@ export async function startBattle(ctx) {
     blip(200, 0.3, 'sawtooth', 0.055, 1);
     setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05, 1), 170);
     document.getElementById('over-dsc').textContent = `도달 웨이브 ${S.wave} · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
+    const plan = nextExpeditionPlan({ ...ctx.save, bestWave: Math.max(ctx.save.bestWave, S.wave) }, S.gold);
+    const temporary = ctx.isSessionOnly?.();
+    document.getElementById('over-plan').textContent = temporary
+      ? '임시 진행은 기지 복귀 시 초기화됩니다.\n기존 저장 원본은 변경하지 않습니다.'
+      : `귀환 후 ${plan.gold}골드 · 다음 목표 웨이브 ${plan.target}\n추천 ${plan.name}: ${plan.benefit}\n비용 ${plan.cost} · ${plan.shortage ? plan.shortage + '골드 더 모으기' : '귀환 후 강화 가능'}\n공·패시브는 이번 원정만, 기지 강화는 유지`;
     document.getElementById('ov-over').classList.remove('hidden');
     document.getElementById('btn-tobase').focus({ preventScroll: true });
     const finish = () => {
@@ -1201,4 +1206,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-    }
+        }
