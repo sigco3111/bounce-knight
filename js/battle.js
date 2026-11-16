@@ -202,6 +202,7 @@ export async function startBattle(ctx) {
     if (def.type === 'fire') ring(e.x, e.z, 0xff7a1f, ev ? 1.5 : 1.1, 0.4);
     else if (def.type === 'ice') ring(e.x, e.z, 0x9fd8ff, ev ? 1.2 : 0.9, 0.5);
     else if (def.type === 'bolt') ring(e.x, e.z, 0xffe14d, ev ? 1.0 : 0.75, 0.24);
+    else if (def.type === 'poison') ring(e.x, e.z, 0x7ddc3f, ev ? 1.3 : 1.0, 0.5);
     else ring(e.x, e.z, 0xdde7f2, ev ? 0.9 : 0.7, 0.3);
     if (def.type === 'fire') { // 폭발형: 크고 높이 솟는 화염 파편 + 잔불
       burst(e.x, e.z, 0xff7a1f, ev ? 16 : 11, ev ? 5.2 : 4.0, y, { vy0: 3, vyR: 3.5, ttl0: 0.6, ttlR: 0.3, sc: ev ? 1.5 : 1.15 });
@@ -212,6 +213,9 @@ export async function startBattle(ctx) {
     } else if (def.type === 'bolt') { // 빠르고 짧은 전기 스냅 + 백색 섬광
       burst(e.x, e.z, 0xffd400, ev ? 14 : 10, ev ? 7 : 5.5, y, { vy0: 1.2, vyR: 1.6, ttl0: 0.3, ttlR: 0.12, sc: ev ? 1.3 : 1.0 });
       burst(e.x, e.z, 0xffffff, 2, 3.2, y, { vy0: 0.8, vyR: 0.6, ttl0: 0.18, ttlR: 0.08, sc: 0.55 });
+    } else if (def.type === 'poison') { // 부글부글 올라오는 독방울 + 연녹 기포
+      burst(e.x, e.z, 0x7ddc3f, ev ? 13 : 9, ev ? 2.2 : 1.7, y, { vy0: 0.8, vyR: 1.1, ttl0: 0.7, ttlR: 0.3, sc: ev ? 1.25 : 1 });
+      burst(e.x, e.z, 0xd6ffb0, 4, 1.2, y, { vy0: 1.4, vyR: 0.8, ttl0: 0.45, ttlR: 0.2, sc: 0.6 });
     } else { // iron: 묵직한 금속 파편
       burst(e.x, e.z, 0xdde7f2, ev ? 14 : 9, ev ? 4.8 : 3.6, y, { vy0: 2, vyR: 2.5, ttl0: 0.45, ttlR: 0.15, sc: ev ? 1.4 : 1 });
     }
@@ -300,7 +304,7 @@ export async function startBattle(ctx) {
     for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(0xffffff); mt.emissiveIntensity = 0.9; } }
     if (src.def.evolved) { S.evolvedHits++; S.lastEvolvedDmg = dmg; }
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + dmg); }
-    const th = { fire: [170, 'square', 0.05], ice: [560, 'sine', 0.05], bolt: [980, 'sawtooth', 0.03], iron: [220, 'square', 0.04] }[src.def.type] || [220, 'square', 0.04];
+    const th = { fire: [170, 'square', 0.05], ice: [560, 'sine', 0.05], bolt: [980, 'sawtooth', 0.03], iron: [220, 'square', 0.04], poison: [340, 'triangle', 0.045] }[src.def.type] || [220, 'square', 0.04];
     blip(th[0] + Math.random() * 50, th[2], th[1], 0.025); // per-type hit timbre
     typeHitBurst(src.def, e);
     if (src.def.type === 'fire') {
@@ -308,6 +312,11 @@ export async function startBattle(ctx) {
       for (const o of S.enemies) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < rad) { o.hp -= sd; updEnemyLabel(o); }
     } else if (src.def.type === 'ice') {
       e.frozen = src.def.evolved ? 3 : 1.5;
+    } else if (src.def.type === 'poison') {
+      const dur = src.def.evolved ? 4 : 2.5, tot = ballDmg(src.def) * (src.def.evolved ? 2.5 : 1);
+      const dps = tot / dur; // 지속 피해: 총량은 공 위력 비례, 진화 시 더 오래 더 강하게
+      if (!e.poison || e.poison.dps <= dps) e.poison = { dps, t: dur, acc: 0 };
+      else e.poison.t = Math.max(e.poison.t, dur);
     } else if (src.def.type === 'bolt') {
       const nChain = src.def.evolved ? 3 : 1;
       const others = S.enemies.filter(o => o !== e).sort((a, b) => Math.hypot(a.x - e.x, a.z - e.z) - Math.hypot(b.x - e.x, b.z - e.z));
@@ -370,7 +379,7 @@ export async function startBattle(ctx) {
   function levelUp() {
     S.phase = 'levelup'; S.level++;
     const pool = [];
-    pool.push({ kind: 'new', type: ['fire', 'ice', 'bolt'][Math.floor(Math.random() * 3)] });
+    pool.push({ kind: 'new', type: ['fire', 'ice', 'bolt', 'poison'][Math.floor(Math.random() * 4)] });
     const owned = S.inventory.filter(b => !b.evolved);
     if (owned.length) { const b = owned[Math.floor(Math.random() * owned.length)]; pool.push({ kind: 'up', ball: b }); }
     pool.push({ kind: 'mul' });
@@ -604,6 +613,18 @@ export async function startBattle(ctx) {
         e.flash -= dt;
         const k = Math.max(0, e.flash / 0.14);
         for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(k > 0 ? 0xffffff : mt.userData._e); mt.emissiveIntensity = k > 0 ? 0.9 * k : mt.userData._ei; } }
+      }
+      if (e.poison) { // 중독 지속 피해
+        e.poison.t -= dt;
+        e.hp -= e.poison.dps * dt;
+        e.poison.acc += e.poison.dps * dt;
+        if (e.poison.acc >= 1) {
+          if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + Math.round(e.poison.acc), 'poison'); }
+          e.poison.acc = 0;
+          updEnemyLabel(e);
+        }
+        if (e.hp <= 0) { killEnemy(e); continue; }
+        if (e.poison.t <= 0) e.poison = null;
       }
       if (e.frozen > 0) { e.frozen -= dt; continue; }
       e.z += MARCH_SPEED * e.def.spd * dt;
