@@ -113,30 +113,35 @@ export async function startBattle(ctx) {
   const TW = 2.2, floorTiles = [];
   for (let i = -2; i <= 2; i++) for (let j = -4; j <= 2; j++)
     floorTiles.push((await loadModel('./models/d_floor_tile_large.glb', { w: TW, x: i * TW, z: j * TW })).obj);
-  // Identical static tiles share draws. Keep every source mesh transform and material.
-  const floorGroups = new Map();
-  for (const tile of floorTiles) {
-    doubleSide(tile); tile.updateMatrixWorld(true);
-    tile.traverse(mesh => {
-      if (!mesh.isMesh) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      const key = mesh.geometry.uuid + ':' + materials.map(m => m.uuid).join(',');
-      if (!floorGroups.has(key)) floorGroups.set(key, { geometry: mesh.geometry, material: mesh.material, transforms: [] });
-      floorGroups.get(key).transforms.push(mesh.matrixWorld.clone());
-    });
+  // Identical static pieces share draws. Keep every source mesh transform and material.
+  function addStaticBatch(objects) {
+    const groups = new Map();
+    for (const tile of objects) {
+      doubleSide(tile); tile.updateMatrixWorld(true);
+      tile.traverse(mesh => {
+        if (!mesh.isMesh) return;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        const key = mesh.geometry.uuid + ':' + materials.map(m => m.uuid).join(',');
+        if (!groups.has(key)) groups.set(key, { geometry: mesh.geometry, material: mesh.material, transforms: [] });
+        groups.get(key).transforms.push(mesh.matrixWorld.clone());
+      });
+    }
+    for (const group of groups.values()) {
+      const batch = new THREE.InstancedMesh(group.geometry, group.material, group.transforms.length);
+      group.transforms.forEach((matrix, i) => batch.setMatrixAt(i, matrix));
+      batch.computeBoundingSphere(); scene.add(batch);
+    }
   }
-  for (const group of floorGroups.values()) {
-    const batch = new THREE.InstancedMesh(group.geometry, group.material, group.transforms.length);
-    group.transforms.forEach((matrix, i) => batch.setMatrixAt(i, matrix));
-    batch.computeBoundingSphere(); scene.add(batch);
-  }
+  addStaticBatch(floorTiles);
+  const wallPieces = [];
   for (let z = -8.9; z <= 4; z += 2.59) {
     const lw = (await loadModel('./models/d_wall.glb', { h: 2.7, x: -3.45, z, ry: Math.PI / 2 })).obj;
     const rw = (await loadModel('./models/d_wall.glb', { h: 2.7, x: 3.45, z, ry: -Math.PI / 2 })).obj;
-    doubleSide(lw); doubleSide(rw); scene.add(lw); scene.add(rw);
+    wallPieces.push(lw, rw);
   }
   for (const x of [-2.6, 0, 2.6])
-    scene.add((await loadModel('./models/d_wall.glb', { h: 3.0, x, z: BACK - 0.5 })).obj);
+    wallPieces.push((await loadModel('./models/d_wall.glb', { h: 3.0, x, z: BACK - 0.5 })).obj);
+  addStaticBatch(wallPieces);
   scene.add((await loadModel('./models/d_banner_red.glb', { h: 1.5, x: -1.3, y: 1.1, z: BACK - 0.1 })).obj);
   scene.add((await loadModel('./models/d_banner_red.glb', { h: 1.5, x: 1.3, y: 1.1, z: BACK - 0.1 })).obj);
   for (const t of [{ x: -3.2, z: -2.6 }, { x: 3.2, z: -6.2 }]) {
@@ -1118,4 +1123,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                                          }
+        }
