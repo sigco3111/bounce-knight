@@ -120,6 +120,7 @@ function showLoadError(screen) {
   guard.innerHTML = `<div class="ttl" id="load-error-title" style="text-align:center;word-break:keep-all">화면을 불러오지 못했습니다</div><div class="dsc" style="max-width:340px;text-align:center;line-height:1.8">연결을 확인한 뒤 다시 불러와 주세요.<br>${sessionOnly ? '다시 불러오면 저장되지 않은<br>이번 임시 진행이 초기화됩니다.<br>기존 저장 원본은 삭제하지 않습니다.' : '저장된 진행은 변경하지 않았습니다.'}</div><button class="btn" type="button">${sessionOnly ? '초기화 후 다시 불러오기' : '다시 불러오기'}</button>`;
   document.body.appendChild(guard);
   const go = guard.querySelector('button'); go.style.cssText = 'max-width:100%;white-space:normal'; go.focus();
+  guard.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); go.focus(); } });
   go.onclick = () => { go.disabled = true; location.reload(); };
 }
 function begin() { if (params.has('battle')) showBattle(); else showBase(); }
