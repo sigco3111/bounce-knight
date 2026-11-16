@@ -100,9 +100,10 @@ export async function startBattle(ctx) {
   }
   const btl = new THREE.PointLight(0xff8c3a, 20, 10, 2); btl.position.set(0, 2.1, BACK + 0.8); scene.add(btl);
 
-  // breach boundary telegraph: pulsing red line at DANGER_Z
-  const dl = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 0.55), new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }));
-  dl.position.set(0, 0.32, DANGER_Z); scene.add(dl);
+  // breach boundary telegraph: DOM overlay line at DANGER_Z (3D plane is nearly edge-on to the top-down camera and invisible)
+  const dlEl = document.createElement('div');
+  dlEl.id = 'danger-line';
+  labelsC.parentElement.appendChild(dlEl);
   const hitFlash = document.createElement('div');
   hitFlash.id = 'hit-flash';
   labelsC.parentElement.appendChild(hitFlash);
@@ -498,7 +499,7 @@ export async function startBattle(ctx) {
       spawnRow(!bossAlive);
     }
     // gems
-    dl.material.opacity = 0.22 + 0.22 * Math.abs(Math.sin(S.t * 3)); // telegraph pulse
+    if (!ctx.norender) { const dp = proj(new THREE.Vector3(0, 0.05, DANGER_Z)); dlEl.style.top = dp.y + 'px'; } // telegraph pulse
     for (const g of [...S.gems]) {
       g.ttl -= dt;
       g.mesh.rotation.y += dt * 3;
@@ -590,4 +591,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+          }
