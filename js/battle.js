@@ -464,7 +464,8 @@ export async function startBattle(ctx) {
       else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = `발사 주기 ${(FIRE_INTERVAL * S.fireMul).toFixed(2)}초 → ${(FIRE_INTERVAL * S.fireMul * 0.85).toFixed(2)}초 (최대 3회 중첩)`; }
       else if (c.kind === 'life') { ic = '#ff7a9d'; t1 = '패시브: 수호 심장'; t2 = `HP ${S.heroHP} → ${Math.min(5, S.heroHP + 1)} (최대 5)`; }
       else { const flv = c.pair[0].lv; ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + flv; t2 = EVOLVED[c.pair[0].type].desc + ` 기본 적중 피해 ${ballDmg({ lv: flv, evolved: true })} (기존 각 ${flv}) · 공 2개 → 1개`; }
-      const d = document.createElement('div');
+      const d = document.createElement('button');
+      d.type = 'button';
       d.className = 'card-pick';
       d.dataset.kind = c.kind;
       if (c.type) d.dataset.type = c.type;
@@ -474,6 +475,7 @@ export async function startBattle(ctx) {
     }
     document.getElementById('bt-lv').textContent = 'Lv.' + S.level;
     document.getElementById('ov-levelup').classList.remove('hidden');
+    cards.firstElementChild?.focus({ preventScroll: true });
     if (ctx.auto) setTimeout(() => {
       const fuse = picks.find(c => c.kind === 'fuse');
       const c = fuse || picks[Math.floor(Math.random() * picks.length)];
@@ -848,4 +850,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+      }
