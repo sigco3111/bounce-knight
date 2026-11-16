@@ -80,7 +80,7 @@ async function showBase() {
   if (current === 'base') return;
   current = 'base';
   try { await startBase({ save, persist, onSortie: showBattle }); }
-  catch (_) { showLoadError('base'); return; }
+  catch (error) { showLoadError('base', error); return; }
   offerLegacyImport();
   if (auto) document.getElementById('btn-sortie').click();
 }
@@ -111,14 +111,15 @@ async function showBattle() {
       if (sessionOnly) { confirmSessionReset(); return; }
       location.reload(); // clean 3D state by reloading into base
     },
-  }); } catch (_) { showLoadError('battle'); }
+  }); } catch (error) { showLoadError('battle', error); }
 }
-function showLoadError(screen) {
+function showLoadError(screen, error) {
+  const graphicsFailed = error?.code === 'GRAPHICS_INIT_FAILED';
   if (current !== screen || document.getElementById('load-error-guard')) return;
   const guard = document.createElement('div'); guard.className = 'overlay'; guard.id = 'load-error-guard';
   guard.setAttribute('role', 'dialog'); guard.setAttribute('aria-modal', 'true'); guard.setAttribute('aria-labelledby', 'load-error-title');
   guard.style.cssText = 'z-index:50;background:#080d19;padding:16px;box-sizing:border-box;overflow:auto';
-  guard.innerHTML = `<div class="ttl" id="load-error-title" style="text-align:center;word-break:keep-all">화면을 불러오지 못했습니다</div><div class="dsc" style="max-width:340px;text-align:center;line-height:1.8">연결을 확인한 뒤 다시 불러와 주세요.<br>${sessionOnly ? '다시 불러오면 저장되지 않은<br>이번 임시 진행이 초기화됩니다.<br>기존 저장 원본은 삭제하지 않습니다.' : '저장된 진행은 변경하지 않았습니다.'}</div><button class="btn" type="button">${sessionOnly ? '초기화 후 다시 불러오기' : '다시 불러오기'}</button>`;
+  guard.innerHTML = `<div class="ttl" id="load-error-title" style="text-align:center;word-break:keep-all">${graphicsFailed ? '3D 화면을 시작하지 못했습니다' : '화면을 불러오지 못했습니다'}</div><div class="dsc" style="max-width:340px;text-align:center;line-height:1.8">${graphicsFailed ? '브라우저의 3D 그래픽 지원/설정을 확인한 뒤<br>다시 불러와 주세요.' : '연결을 확인한 뒤 다시 불러와 주세요.'}<br>${sessionOnly ? '다시 불러오면 저장되지 않은<br>이번 임시 진행이 초기화됩니다.<br>기존 저장 원본은 삭제하지 않습니다.' : '저장된 진행은 변경하지 않았습니다.'}</div><button class="btn" type="button">${sessionOnly ? '초기화 후 다시 불러오기' : '다시 불러오기'}</button>`;
   document.body.appendChild(guard);
   const go = guard.querySelector('button'); go.style.cssText = 'max-width:100%;white-space:normal'; go.focus();
   guard.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); go.focus(); } });
