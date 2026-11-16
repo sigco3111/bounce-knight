@@ -1,4 +1,4 @@
-import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice, KNIGHTS, ROUTES, RELICS, relicOptions, CONTRACTS, contractProgress } from './content.js';
+import { ENEMY_GUIDE, specialEnemyAt, shieldDirect, REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice, KNIGHTS, ROUTES, RELICS, relicOptions, CONTRACTS, contractProgress } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, BASE_ELEMENTS, crossFusion, ballHas, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
@@ -28,6 +28,9 @@ const ENEMY_DEFS = {
   rogue:   { u: './models/30-Skeleton_Rogue.glb',   s: 0.7, hp: w => Math.round(3 + w * 0.7),  gold: 4, xp: 1, spd: 1.25 },
   mage:    { u: './models/28-Skeleton_Mage.glb',    s: 0.7, hp: w => Math.round(3 + w * 0.8),  gold: 5, xp: 2, spd: 0.9 },
   warrior: { u: './models/31-Skeleton_Warrior.glb', s: 0.7, hp: w => Math.round(8 + w * 1.2),  gold: 9, xp: 2, spd: 0.65 },
+  shield:  { u: './models/31-Skeleton_Warrior.glb', s: 0.78, hp: w => Math.round(5 + w * 0.8), gold: 7, xp: 2, spd: 0.75 },
+  healer:  { u: './models/28-Skeleton_Mage.glb', s: 0.76, hp: w => Math.round(4 + w * 0.7), gold: 8, xp: 2, spd: 0.7 },
+  volatile:{ u: './models/29-Skeleton_Minion.glb', s: 0.8, hp: w => Math.round(4 + w * 0.6), gold: 7, xp: 2, spd: 0.9 },
   boss:    { u: './models/31-Skeleton_Warrior.glb', s: 1.15, hp: w => Math.round((8 + w * 1.2) * 3), gold: 30, xp: 6, spd: 0.45 },
 };
 
@@ -216,7 +219,7 @@ export async function startBattle(ctx) {
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
-    combo: 0, comboT: -99, shieldSpent: false, relicWardSpent: false, relicKills: 0, relics: [], relicWaves: [], discoveries: [], reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
+    blasts: [], shieldsBlocked: 0, enemyHeals: 0, blastDodges: 0, combo: 0, comboT: -99, shieldSpent: false, relicWardSpent: false, relicKills: 0, relics: [], relicWaves: [], discoveries: [], reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -272,6 +275,18 @@ export async function startBattle(ctx) {
       const crown = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.07, 6, 8), new THREE.MeshStandardMaterial({ color: 0xffd479, emissive: 0xd7842b, emissiveIntensity: 0.6 }));
       crown.material.userData._e = 0xd7842b; crown.material.userData._ei = 0.6; mats.push(crown.material); crown.userData.personalGeometry = true; crown.rotation.x = Math.PI / 2; crown.position.y = m.h / def.s + 0.05; m.obj.add(crown);
     }
+    const guide = ENEMY_GUIDE.find(g => g.id === type);
+    if (guide) {
+      const mat = new THREE.MeshBasicMaterial({ color: guide.color, transparent: true, opacity: 0.82, depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide });
+      mat.userData._e = 0; mat.userData._ei = 0; mats.push(mat);
+      let marker;
+      if (type === 'shield') { marker = new THREE.Mesh(new THREE.CircleGeometry(0.52, 16), mat); marker.position.set(0, m.h / def.s * 0.48, 0.55); marker.scale.y = 1.25; }
+      else if (type === 'healer') {
+        marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.65, 0.1), mat); marker.position.set(0, m.h / def.s + 0.28, 0);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.16, 0.1), mat); arm.userData.personalGeometry = true; marker.add(arm);
+      } else { marker = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.12, 6, 16), mat); marker.position.set(0, m.h / def.s + 0.25, 0.3); }
+      marker.renderOrder = 2; marker.userData.personalGeometry = true; m.obj.add(marker);
+    }
     const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2) * S.riskMul * route.hp);
     const e = { originX: x, id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
@@ -281,7 +296,7 @@ export async function startBattle(ctx) {
   }
   function updEnemyLabel(e) {
     e.label.el.classList.toggle('hidden', e.type === 'boss'); // 보스 HP는 상단 전용 바에서만 표시
-    const role = { minion: '', rogue: '회피 이동', mage: '지면 시전', warrior: '중장갑', boss: '' }[e.type];
+    const role = { minion: '', rogue: '회피 이동', mage: '지면 시전', warrior: '중장갑', shield: '방패병 · 정면 방어', healer: '치유 사제', volatile: '폭발 운반병', boss: '' }[e.type];
     e.label.el.innerHTML = `${role ? '<div style="font-size:8px;line-height:10px;color:#d4dcec">' + role + '</div>' : ''}<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
   function milestone(w, boss = false) { // wave-clear reward, real gold + heal, not just UI
@@ -385,12 +400,15 @@ export async function startBattle(ctx) {
     }
     const count = 1 + Math.min(3, Math.floor((w - 1) / 4));
     const xs = [-2.3, -0.8, 0.8, 2.3].sort(() => Math.random() - 0.5).slice(0, count);
+    let rowIndex = 0;
     for (const x of xs) {
       let type = 'minion';
       const r = Math.random();
       if (w >= 7 && r < 0.14) type = 'warrior';
       else if (w >= 5 && r < 0.4) type = 'mage';
       else if (w >= 3 && r < 0.65) type = 'rogue';
+      if (advance && rowIndex === 0 && specialEnemyAt(w)) type = specialEnemyAt(w);
+      rowIndex++;
       await spawnEnemy(type, x + (Math.random() - 0.5) * 0.4, -6.9 - Math.random() * 0.5);
     }
     if (route.id === 'elite' && advance && [4,7].includes(w)) await spawnEnemy('warrior', 0, -7.1);
@@ -415,6 +433,19 @@ export async function startBattle(ctx) {
     scene.remove(e.warning); e.warning.material.dispose(); e.warning = null;
   }
   function updateEnemyTactic(e, dt) {
+    if (e.type === 'healer') {
+      e.healTimer = (e.healTimer ?? 4) - dt;
+      if (e.healTimer <= 0) {
+        e.healTimer = 4;
+        let healed = 0;
+        for (const o of S.enemies) if (o !== e && o.hp > 0 && o.hp < o.maxHp && Math.hypot(o.x - e.x, o.z - e.z) <= 2) {
+          o.hp = Math.min(o.maxHp, o.hp + 1); updEnemyLabel(o); healed++;
+          ring(o.x, o.z, 0x80ffc4, 0.65, 0.5);
+        }
+        if (healed) { S.enemyHeals += healed; ring(e.x, e.z, 0x80ffc4, 2, 0.65); updBossBar(); }
+      }
+      return 1;
+    }
     if (e.type === 'boss' && regionIndex === 1) {
       e.summonTimer = (e.summonTimer ?? 3) - dt;
       if (e.summonTimer <= 0) {
@@ -553,6 +584,12 @@ export async function startBattle(ctx) {
   }
 
   function damageEnemy(e, dmg, src) {
+    const beforeShield = dmg;
+    dmg = shieldDirect(e, src, dmg, ballHas(src.def, 'pierce'));
+    if (dmg < beforeShield) {
+      S.shieldsBlocked++; ring(e.x, e.z + 0.25, 0x6daeff, 0.65, 0.25);
+      if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.8, e.z)); popup(labelsC, p.x, p.y, '방패 -1'); }
+    }
     const reaction = ballReaction(src.def, e);
     if (reaction) {
       e.hp -= reaction.damage; S.reactions++;
@@ -639,7 +676,30 @@ export async function startBattle(ctx) {
     labels.remove(e.label);
     if (e.type === 'boss') updBossBar(); // defeat, boundary breach and hero contact all remove its HP bar
   }
+  function startDeathBlast(e) {
+    const b = { x: e.x, z: e.z, left: 1.5 };
+    if (!ctx.norender) {
+      b.mesh = new THREE.Mesh(spellWarningGeo, new THREE.MeshBasicMaterial({ color: 0xffa25b, transparent: true, opacity: 0.7, depthTest: false, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      b.mesh.rotation.x = -Math.PI / 2; b.mesh.scale.setScalar(1.1 / 0.8); b.mesh.position.set(b.x, 0.09, b.z); b.mesh.renderOrder = 4; scene.add(b.mesh);
+      popup(labelsC, W() / 2, VH() * 0.29, '운반병 폭발 예고 · 원 밖으로!', 'banner');
+    }
+    S.blasts.push(b);
+  }
+  function removeDeathBlast(b) { if (b.mesh) { scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh = null; } }
+  function tickDeathBlasts(dt) {
+    for (const b of [...S.blasts]) {
+      b.left -= dt;
+      if (b.mesh) b.mesh.material.opacity = 0.45 + Math.sin(b.left * 18) * 0.22;
+      if (b.left > 0) continue;
+      removeDeathBlast(b); S.blasts = S.blasts.filter(x => x !== b);
+      ring(b.x, b.z, 0xffa25b, 1.1, 0.4); burst(b.x, b.z, 0xffa25b, 12, 3, 0.4);
+      if (Math.hypot(S.heroX - b.x, S.heroZ - b.z) < 1.1) hurtHero(1, b.x, b.z); else S.blastDodges++;
+      if (S.over) break;
+    }
+  }
   function killEnemy(e, kc = 0xffd76a) { // 처치 파편은 죽인 공 타입 색(기본 금색): 처치 주체가 색으로 읽힘
+    if (!S.enemies.includes(e)) return;
+    if (e.type === 'volatile') startDeathBlast(e);
     S.enemies = S.enemies.filter(x => x !== e);
     rmvEnemy(e);
     S.kills++;
@@ -890,6 +950,7 @@ export async function startBattle(ctx) {
   function gameOver() {
     if (S.over) return;
     S.contractResult = contractProgress(contract, S); S.gold += S.contractResult.reward;
+    for (const b of S.blasts) removeDeathBlast(b); S.blasts = [];
     S.over = true; S.phase = 'over'; clearControls(); clearRegionHazard();
     for (const e of S.enemies) clearEnemyWarning(e);
     document.getElementById('over-ttl').textContent = S.victory ? `${region.name} 정복!` : '원정 종료';
@@ -1280,6 +1341,7 @@ export async function startBattle(ctx) {
         if (S.over) return;
       }
     }
+    tickDeathBlasts(dt); if (S.over) return;
     // spawn waves: time-based, but the wave counter pauses while a boss lives (boss gates progress; pressure rows keep spawning)
     S.spawnTimer -= dt;
     if (S.spawnTimer <= 0) {
@@ -1371,6 +1433,7 @@ export async function startBattle(ctx) {
     S.fcount++;
     document.getElementById('state').textContent = JSON.stringify({
       region: region.id, knight: knight.id, route: route.id, contract: contract.id, relics: S.relics, victory: S.victory, phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
+      enemyTypes: S.enemies.map(e => e.type), shieldsBlocked: S.shieldsBlocked, enemyHeals: S.enemyHeals, blasts: S.blasts.length, blastDodges: S.blastDodges,
       enemies: S.enemies.length, balls: S.balls.length, gems: S.gems.length, gemsGot: S.gemsGot,
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
@@ -1419,4 +1482,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                        }
+  }
