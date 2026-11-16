@@ -18,17 +18,17 @@ let seed = 811;
 const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
 function fixture(inventory, hp = 3, fireMul = 1) {
   const elements = new Map();
-  const make = () => ({ dataset: {}, classList: { add() {}, remove() {} }, focus() {}, children: [],
+  const make = () => { const classes = new Set(); return { dataset: {}, classList: { add(c) { classes.add(c); }, remove(c) { classes.delete(c); }, contains(c) { return classes.has(c); } }, focus() {}, children: [],
     appendChild(el) { this.children.push(el); this.firstElementChild = this.children[0]; },
-    set innerHTML(value) { this.html = value; if (value === '') this.children = []; } });
+    set innerHTML(value) { this.html = value; if (value === '') this.children = []; } }; };
   const document = { getElementById(id) { if (!elements.has(id)) elements.set(id, make()); return elements.get(id); }, createElement: make };
   const S = { inventory: structuredClone(inventory), phase: 'play', level: 1, xp: 0, heroHP: hp, fireMul, dmgMul: 1, heroX: 0, heroZ: 0 };
-  const box = vm.createContext({ S, document, Math: Object.assign(Object.create(Math), { random }),
+  const box = vm.createContext({ S, document, scr: document.getElementById('screen-battle'), Math: Object.assign(Object.create(Math), { random }),
     ctx: { auto: false, norender: true }, FIRE_INTERVAL: 0.5, clearControls() {}, updHud() {},
     xpNeed: () => 4 + S.level * 3, blip() {}, fusionFx() {}, setTimeout() {} });
   vm.runInContext(definitions + '\n' + cardLogic + '\nglobalThis.qa={levelUp,applyCard,fusiblePairs,ballDmg};', box);
   box.qa.levelUp();
-  return { S, qa: box.qa, cards: elements.get('lv-cards').children };
+  return { S, scr: document.getElementById('screen-battle'), qa: box.qa, cards: elements.get('lv-cards').children };
 }
 const ball = (type = 'iron', lv = 1, evolved = false) => ({ type, lv, evolved });
 let cases = 0;
@@ -41,6 +41,7 @@ for (let i = 0; i < 400; i++) {
   ]) {
     const f = fixture(inventory);
     assert.equal(f.cards.length, 4);
+    assert.ok(f.scr.classList.contains('choice-dialog-open'));
     assert.deepEqual(Array.from(f.cards.slice(0, 2), c => c.dataset.kind), ['new', 'new']);
     assert.notEqual(f.cards[0].dataset.type, f.cards[1].dataset.type);
     assert.ok(['fuse', 'up'].includes(f.cards[2].dataset.kind));
@@ -48,6 +49,7 @@ for (let i = 0; i < 400; i++) {
     const selected = i % 4, before = f.S.inventory.length;
     f.cards[selected].onclick();
     assert.equal(f.S.phase, 'play');
+    assert.equal(f.scr.classList.contains('choice-dialog-open'), false);
     const after = f.S.inventory.length;
     assert.equal(after, before + (selected < 2 ? 1 : f.cards[selected].dataset.kind === 'fuse' ? -1 : 0));
     const snapshot = JSON.stringify(f.S);
