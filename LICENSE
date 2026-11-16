@@ -23,4 +23,4 @@ SOFTWARE.
 ---
 Third-party assets:
 - KayKit 3D asset packs by Kay Lousberg (kaylousberg.itch.io): CC0 1.0 Universal
-- three.js (lib/three.module.js, lib/loaders, lib/utils): MIT License, Copyright (c) 2010-2026 three.js authors
+- three.js (jsdelivr CDN, pinned three@0.160.0 build + examples/jsm loaders): MIT License, Copyright (c) 2010-2026 three.js authors
