@@ -429,6 +429,14 @@ export async function startBattle(ctx) {
   }
 
   // ---- level up / fusion ----
+  document.getElementById('ov-levelup').addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || S.phase !== 'levelup') return;
+    const buttons = [...document.querySelectorAll('#lv-cards .card-pick')];
+    if (!buttons.length) return;
+    const i = buttons.indexOf(document.activeElement);
+    const next = e.shiftKey ? (i <= 0 ? buttons.length - 1 : i - 1) : (i + 1) % buttons.length;
+    e.preventDefault(); buttons[next].focus(); // 네 카드 안에서 포커스를 순환
+  });
   function fusiblePairs() {
     const seen = {};
     for (const b of S.inventory) {
@@ -861,4 +869,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+      }
