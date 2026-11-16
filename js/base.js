@@ -3,8 +3,8 @@ import { loadModel, HtmlLabels } from './common.js';
 
 const BLD = [
   { key: 'castleLv', name: '성', desc: lv => `영웅 최대 HP ${3 + lv - 1} → ${3 + lv}` },
-  { key: 'forgeLv', name: '대장간 · 강화', desc: lv => `모든 공 피해량 +${(lv - 1) * 20}% → +${lv * 20}%` },
-  { key: 'tavernLv', name: '주점 · 공 합성', desc: lv => `출격 시 기본 공 ${lv}개 → ${lv + 1}개` },
+  { key: 'forgeLv', name: '대장간 · 강화', desc: lv => `공 직격 피해량 +${(lv - 1) * 20}% → +${lv * 20}%` },
+  { key: 'tavernLv', name: '주점 · 출격 공', desc: lv => `출격 시 기본 공 ${lv + 2}개 → ${lv + 3}개` },
 ];
 const cost = lv => 60 * lv;
 
@@ -26,7 +26,8 @@ export async function startBase(ctx) {
   scene.background = new THREE.Color(0x0a0f1c);
   scene.fog = new THREE.Fog(0x0a0f1c, 10, 26);
   const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 80);
-  window.addEventListener('resize', () => { renderer.setSize(W(), H()); camera.aspect = W() / H(); camera.updateProjectionMatrix(); });
+  const resize = () => { renderer.setSize(W(), H()); camera.aspect = W() / H(); camera.updateProjectionMatrix(); };
+  window.addEventListener('resize', resize);
   camera.position.set(0, 10.8, 13.6);
   camera.lookAt(0, 0, -0.4);
   camera.updateMatrixWorld(true);
@@ -109,7 +110,14 @@ export async function startBase(ctx) {
   upd();
 
   (function loop() {
-    if (scr.classList.contains('hidden')) return; // 출격 후 숨겨진 기지를 계속 그리지 않음
+    if (scr.classList.contains('hidden')) {
+      // 복귀는 새 페이지이므로 숨은 기지의 GPU 컨텍스트/리사이즈 참조를 남기지 않음.
+      window.removeEventListener('resize', resize);
+      renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      ground.geometry.dispose(); ground.material.dispose();
+      ball.geometry.dispose(); ball.material.dispose();
+      return;
+    }
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
   })();
