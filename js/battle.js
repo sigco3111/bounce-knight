@@ -744,7 +744,7 @@ export async function startBattle(ctx) {
         b.trail.geometry.setDrawRange(0, Math.max(2, nn));
       }
       if (b.z > RETURN_Z && b.vz > 0) {
-        scene.remove(b.mesh); if (b.trail) { scene.remove(b.trail); b.trail.geometry.dispose(); b.trail.material.dispose(); }
+        scene.remove(b.mesh); b.mesh.material.dispose(); if (b.trail) { scene.remove(b.trail); b.trail.geometry.dispose(); b.trail.material.dispose(); }
         S.balls = S.balls.filter(x => x !== b);
       }
     }
@@ -807,6 +807,7 @@ export async function startBattle(ctx) {
         rmvEnemy(e);
         hurtHero(e.type === 'boss' ? 3 : e.type === 'warrior' ? 2 : 1, e.x, DANGER_Z);
         if (S.over) return;
+        continue; // 경계에서 이미 제거/피해 처리한 적은 접촉 피해를 다시 주지 않는다.
       }
       // 영웅 접촉
       if (Math.hypot(e.x - S.heroX, e.z - S.heroZ) < 0.55) {
@@ -929,4 +930,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-          }
+}
