@@ -614,7 +614,9 @@ export async function startBattle(ctx) {
     if (xpText) xpText.textContent = `경험치 ${S.xp}/${xpNeed()}`;
     const xpBar = document.getElementById('bt-xp').parentElement;
     xpBar.setAttribute('aria-valuenow', String(S.xp)); xpBar.setAttribute('aria-valuemax', String(xpNeed()));
-    document.getElementById('bt-hearts').textContent = '♥'.repeat(Math.max(0, S.heroHP)) || '💀';
+    const hp = Math.max(0, S.heroHP), hearts = document.getElementById('bt-hearts');
+    hearts.textContent = hp > 5 ? `♥ ×${hp}` : ('♥'.repeat(hp) || '💀');
+    hearts.style.whiteSpace = 'nowrap'; hearts.setAttribute('role', 'img'); hearts.setAttribute('aria-label', `남은 HP ${hp}`);
     document.getElementById('bt-balls').innerHTML = S.inventory.map(b =>
       `<span class="ball-chip"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}</span>`).join('');
   }
@@ -961,4 +963,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+                         }
