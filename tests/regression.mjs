@@ -465,3 +465,11 @@ console.log('PASS: fixed special enemy waves and shield facing/freeze/pierce dir
  box.qa.startDeathBlast({x:2,z:0});S.blasts[0].mesh={material:{dispose(){disposed++}}};box.qa.tickDeathBlasts(2);assert.equal(S.blastDodges,1);assert.equal(disposed,1);assert.equal(S.blasts.length,0);
 }
 console.log('PASS: exact healer cadence/cap/range/self exclusion and delayed death blast damage/dodge/single disposal. Modeled, not a visual test.');
+
+assert.equal(shieldDirect({type:'shield',frozen:0,z:0,guardOpen:true},{z:1},1,false),1);
+{
+ const e={type:'shield',guardClock:1.95},box=vm.createContext({Math,updEnemyLabel(){}});
+ vm.runInContext(between(battle,'  function updateEnemyTactic(', '  function startRegionHazard(')+'\nglobalThis.tick=updateEnemyTactic;',box);
+ box.tick(e,.1);assert.equal(e.guardOpen,true);box.tick(e,1.5);assert.equal(e.guardOpen,false);
+}
+console.log('PASS: shield 2sec guard/1.5sec opening cycle lets starting iron balls deal full direct damage in openings.');
