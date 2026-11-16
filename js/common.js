@@ -93,7 +93,7 @@ export function blip(f = 440, d = 0.05, type = 'square', g = 0.035, priority = 0
   }
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    if (actx.state === 'suspended') actx.resume();
+    if (actx.state === 'suspended') actx.resume().catch(() => {}); // browser may deny audio; gameplay must stay usable
     const o = actx.createOscillator(), gn = actx.createGain();
     o.type = type; o.frequency.value = f;
     gn.gain.setValueAtTime(g, actx.currentTime);
