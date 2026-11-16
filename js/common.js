@@ -52,7 +52,9 @@ export class HtmlLabels {
 }
 
 export function popup(container, x, y, text, cls = '') {
-  if (container.childElementCount > 40) container.firstChild.remove();
+  // HP 라벨과 같은 컨테이너를 쓰므로 팝업만 제한. 적 라벨은 지우지 않는다.
+  const activePopups = container.querySelectorAll(':scope > .popup');
+  for (let i = 0; i <= activePopups.length - 40; i++) activePopups[i].remove();
   const d = document.createElement('div');
   d.className = 'popup ' + cls;
   d.textContent = text;
