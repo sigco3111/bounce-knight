@@ -458,7 +458,7 @@ export async function startBattle(ctx) {
       // 선택지 카드에 결과 수치를 미리 보여줘 비교 선택이 되게 (batch 17)
       if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc + ` 기본 적중 피해 ${ballDmg({ lv: 1, evolved: false })}`; }
       else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = `기본 적중 피해 ${ballDmg(c.ball)} → ${ballDmg({ lv: c.ball.lv + 1, evolved: c.ball.evolved })}`; }
-      else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = `모든 공 피해량 ×${S.dmgMul.toFixed(1)} → ×${(S.dmgMul + 0.2).toFixed(1)}`; }
+      else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = `직격 ×${S.dmgMul.toFixed(1)} → ×${(S.dmgMul + 0.2).toFixed(1)} · 독/연쇄 피해 제외`; }
       else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = `발사 주기 ${(FIRE_INTERVAL * S.fireMul).toFixed(2)}초 → ${(FIRE_INTERVAL * S.fireMul * 0.85).toFixed(2)}초 (최대 3회 중첩)`; }
       else if (c.kind === 'life') { ic = '#ff7a9d'; t1 = '패시브: 수호 심장'; t2 = `HP ${S.heroHP} → ${Math.min(5, S.heroHP + 1)} (최대 5)`; }
       else { const flv = c.pair[0].lv; ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + flv; t2 = EVOLVED[c.pair[0].type].desc + ` 기본 적중 피해 ${ballDmg({ lv: flv, evolved: true })} (기존 각 ${flv}) · 공 2개 → 1개`; }
@@ -836,4 +836,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+                                                                                                                       }
