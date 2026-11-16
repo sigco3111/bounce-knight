@@ -100,9 +100,12 @@ export async function startBattle(ctx) {
   }
   const btl = new THREE.PointLight(0xff8c3a, 20, 10, 2); btl.position.set(0, 2.1, BACK + 0.8); scene.add(btl);
 
-  // breach boundary telegraph: thin red line at DANGER_Z
-  const dl = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.4 }));
+  // breach boundary telegraph: pulsing red line at DANGER_Z
+  const dl = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 0.22), new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.6 }));
   dl.rotation.x = -Math.PI / 2; dl.position.set(0, 0.02, DANGER_Z); scene.add(dl);
+  const hitFlash = document.createElement('div');
+  hitFlash.id = 'hit-flash';
+  labelsC.parentElement.appendChild(hitFlash);
   const hero = (await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
   scene.add(hero);
 
@@ -163,10 +166,10 @@ export async function startBattle(ctx) {
   function updEnemyLabel(e) {
     e.label.el.innerHTML = `<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
-  async function spawnRow() {
-    S.wave++;
+  async function spawnRow(advance) {
+    if (advance) S.wave++;
     const w = S.wave;
-    if (w % 5 === 0) { // wave milestone: real reward, not just UI
+    if (advance && w % 5 === 0) { // wave milestone: real reward, not just UI
       const bonus = 10 + w;
       S.gold += bonus;
       const healed = S.heroHP < ctx.heroMaxHP();
@@ -174,7 +177,7 @@ export async function startBattle(ctx) {
       if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
       blip(880, 0.15, 'sine', 0.06);
     }
-    if (w % 10 === 0) { // miniboss wave: single heavy hitter
+    if (advance && w % 10 === 0) { // miniboss wave: single heavy hitter, gates the wave counter until killed
       await spawnEnemy('boss', 0, -6.9);
       if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
       blip(196, 0.4, 'sawtooth', 0.07);
@@ -255,7 +258,8 @@ export async function startBattle(ctx) {
 
   function hurtHero(dmg, ex, ez) {
     S.heroHP -= dmg;
-    S.shake = Math.max(S.shake || 0, 0.3);
+    S.shake = Math.max(S.shake || 0, 0.45);
+    hitFlash.classList.remove('on'); void hitFlash.offsetWidth; hitFlash.classList.add('on');
     const p = proj(new THREE.Vector3(ex != null ? ex : S.heroX, 1.0, ez != null ? ez : S.heroZ));
     popup(labelsC, p.x, p.y, '-' + dmg + ' HP');
     blip(120, 0.2, 'sawtooth', 0.05);
@@ -345,7 +349,8 @@ export async function startBattle(ctx) {
 
   // ---- HUD ----
   function updHud() {
-    document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave);
+    const bossAlive = S.enemies.some(e => e.type === 'boss');
+    document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave) + (bossAlive ? ' · 보스' : '');
     document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 연속x${S.combo}` : '');
     document.getElementById('bt-xp').style.width = Math.min(100, S.xp / xpNeed() * 100) + '%';
     document.getElementById('bt-hearts').textContent = '♥'.repeat(Math.max(0, S.heroHP)) || '💀';
@@ -485,10 +490,15 @@ export async function startBattle(ctx) {
         if (S.over) return;
       }
     }
-    // spawn waves
+    // spawn waves: time-based, but the wave counter pauses while a boss lives (boss gates progress; pressure rows keep spawning)
     S.spawnTimer -= dt;
-    if (S.spawnTimer <= 0) { S.spawnTimer = SPAWN_INTERVAL; spawnRow(); }
+    if (S.spawnTimer <= 0) {
+      S.spawnTimer = SPAWN_INTERVAL;
+      const bossAlive = S.enemies.some(e => e.type === 'boss');
+      spawnRow(!bossAlive);
+    }
     // gems
+    dl.material.opacity = 0.32 + 0.3 * Math.abs(Math.sin(S.t * 3)); // telegraph pulse
     for (const g of [...S.gems]) {
       g.ttl -= dt;
       g.mesh.rotation.y += dt * 3;
@@ -553,7 +563,7 @@ export async function startBattle(ctx) {
   if (ctx.probe) { window.__S = S;
     await spawnEnemy('minion', 0, -3);
     S.aimDir = 0;
-  } else { await spawnRow(); await spawnRow(); }
+  } else { await spawnRow(true); await spawnRow(true); }
   updHud(); showAim();
   raf(loop);
 
