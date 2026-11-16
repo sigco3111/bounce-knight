@@ -121,3 +121,78 @@ assert.equal(liveVoices, 0);
 assert.equal(disconnected, oscillators.length * 2);
 assert.ok(stopped >= oscillators.length);
 console.log('PASS: modeled audio cap 16, priority replacement, pause/mute suppression and oscillator/gain cleanup. Not a listening test.');
+
+// Exercise original save/load/import code in an isolated in-memory storage and DOM.
+// Never run these fixtures against a browser profile or real localStorage.
+function storageFixture(initial = {}, failWrites = false, failReads = false) {
+  const data = new Map(Object.entries(initial)), writes = [], removed = [], elements = new Map();
+  let reloads = 0;
+  const make = () => ({ style: {}, children: [], removed: false,
+    appendChild(child) { this.children.push(child); if (child.id) elements.set(child.id, child); },
+    setAttribute() {}, focus() {}, addEventListener() {},
+    remove() { this.removed = true; if (this.id) elements.delete(this.id); },
+    set innerHTML(value) { this.html = value; for (const match of value.matchAll(/id="([^"]+)"/g)) { const child = make(); child.id = match[1]; elements.set(child.id, child); } } });
+  const base = make(); elements.set('screen-base', base);
+  const localStorage = {
+    getItem(key) { if (failReads) throw new Error('storage blocked'); return data.get(key) ?? null; },
+    setItem(key, value) { if (failWrites) throw new Error('quota'); writes.push([key, value]); data.set(key, value); },
+    removeItem(key) { removed.push(key); data.delete(key); }
+  };
+  const box = vm.createContext({ localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } } });
+  vm.runInContext(between(main, 'const SAVE_KEY', "window.addEventListener('error'") + '\nglobalThis.qa={offerLegacyImport,persist,get save(){return save},get sessionOnly(){return sessionOnly}};', box);
+  return { qa: box.qa, data, writes, removed, elements, reloads: () => reloads, blockWrites() { failWrites = true; } };
+}
+const currentKey = 'bounceknight_save_v1', legacyKey = 'bb_save_v1';
+const oldSave = JSON.stringify({ gold: 456, castleLv: 3, forgeLv: 2, tavernLv: 1, bestWave: 9 });
+for (const malformed of ['{', '{}', 'null', '[]', JSON.stringify({ ...valid, gold: -1 })]) {
+  const f = storageFixture({ [currentKey]: malformed, [legacyKey]: oldSave });
+  assert.ok(f.qa.sessionOnly);
+  f.qa.offerLegacyImport(); assert.ok(!f.elements.has('legacy-save'));
+  f.qa.save.gold += 100; assert.equal(f.qa.persist(), false);
+  assert.equal(f.data.get(currentKey), malformed); assert.equal(f.data.get(legacyKey), oldSave);
+  assert.ok(!f.removed.includes(currentKey) && !f.removed.includes(legacyKey));
+}
+{
+  const f = storageFixture({ [legacyKey]: oldSave });
+  f.qa.offerLegacyImport(); assert.ok(f.elements.has('legacy-save'));
+  assert.equal(f.qa.save.gold, 120); assert.ok(!f.data.has(currentKey));
+  f.elements.get('legacy-yes').onclick();
+  assert.equal(f.qa.save.gold, 456); assert.equal(f.data.get(currentKey), oldSave);
+  assert.equal(f.data.get(legacyKey), oldSave); assert.equal(f.reloads(), 1);
+}
+{
+  const f = storageFixture({ [legacyKey]: oldSave });
+  f.qa.offerLegacyImport(); f.elements.get('legacy-no').onclick();
+  assert.equal(f.qa.save.gold, 120); assert.equal(JSON.parse(f.data.get(currentKey)).gold, 120);
+  assert.equal(f.data.get(legacyKey), oldSave); assert.equal(f.reloads(), 0);
+  assert.ok(!f.elements.has('legacy-save'));
+}
+{
+  const f = storageFixture({ [currentKey]: oldSave, [legacyKey]: oldSave });
+  assert.equal(f.qa.save.gold, 456); f.qa.offerLegacyImport();
+  assert.ok(!f.elements.has('legacy-save')); assert.equal(f.writes.length, 1); // startup capability probe only
+}
+for (const legacy of ['{', '{}', JSON.stringify({ ...JSON.parse(oldSave), otherGame: true })]) {
+  const f = storageFixture({ [legacyKey]: legacy }); f.qa.offerLegacyImport();
+  assert.ok(!f.elements.has('legacy-save')); assert.ok(!f.data.has(currentKey)); assert.equal(f.data.get(legacyKey), legacy);
+}
+for (const failReads of [false, true]) {
+  const f = storageFixture({ [currentKey]: oldSave, [legacyKey]: oldSave }, true, failReads);
+  assert.ok(f.qa.sessionOnly); assert.equal(f.qa.persist(), false);
+  assert.equal(f.data.get(currentKey), oldSave); assert.equal(f.data.get(legacyKey), oldSave);
+}
+{
+  const f = storageFixture({ [legacyKey]: oldSave });
+  f.qa.offerLegacyImport(); f.blockWrites(); f.elements.get('legacy-yes').onclick();
+  assert.equal(f.qa.save.gold, 120); assert.ok(f.qa.sessionOnly);
+  assert.ok(!f.data.has(currentKey)); assert.equal(f.data.get(legacyKey), oldSave);
+  assert.equal(f.reloads(), 0); assert.ok(f.elements.has('save-session-notice'));
+  assert.ok(!f.elements.has('legacy-save'));
+}
+{
+  const f = storageFixture({ [currentKey]: oldSave }); f.blockWrites(); f.qa.save.gold += 10;
+  assert.equal(f.qa.persist(), false); assert.ok(f.qa.sessionOnly);
+  assert.equal(f.data.get(currentKey), oldSave); assert.ok(f.elements.has('save-session-notice'));
+  assert.equal(f.qa.persist(), false);
+}
+console.log('PASS: isolated save flows preserve corrupt/current/legacy originals, never auto-import, require explicit import/ignore, and avoid blocked-storage writes.');
