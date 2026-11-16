@@ -635,6 +635,15 @@ export async function startBattle(ctx) {
 
   // ---- HUD ----
   let inventoryStamp = '';
+  const inventoryRow = document.getElementById('bt-balls');
+  inventoryRow.addEventListener('keydown', e => {
+    const steps = { ArrowDown: 30, ArrowUp: -30, PageDown: inventoryRow.clientHeight, PageUp: -inventoryRow.clientHeight };
+    if (e.key === 'Home') inventoryRow.scrollTop = 0;
+    else if (e.key === 'End') inventoryRow.scrollTop = inventoryRow.scrollHeight;
+    else if (e.key in steps) inventoryRow.scrollTop += steps[e.key];
+    else return;
+    e.preventDefault();
+  });
   function updHud() {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
     document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave) + (bossAlive ? ' · 보스' : '');
@@ -661,6 +670,7 @@ export async function startBattle(ctx) {
       inventoryStamp = stamp;
       const row = document.getElementById('bt-balls');
       row.setAttribute('aria-label', `보유 공 ${S.inventory.length}개`);
+      row.setAttribute('role', 'group'); row.tabIndex = 0;
       row.innerHTML = [...groups.values()].map(({ ball: b, count }) =>
         `<span class="ball-chip" data-count="${count}" aria-label="${ballName(b)} ${count}개"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}${count > 1 ? ' ×' + count : ''}</span>`).join('');
     }
@@ -1108,4 +1118,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                                            }
+      }
