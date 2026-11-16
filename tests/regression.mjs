@@ -217,7 +217,7 @@ console.log('PASS: isolated save flows preserve corrupt/current/legacy originals
 {
 let stopped=0,uncached=0,disposed=0,bossRefresh=0;const removed=[],labels=[];
 const box=vm.createContext({scene:{remove(o){removed.push(o)}},labels:{remove(o){labels.push(o)}},updBossBar(){bossRefresh++}});
-vm.runInContext(between(battle, '  function rmvEnemy(e) {', '  function killEnemy(')+'\nglobalThis.removeEnemy=rmvEnemy;',box);
+vm.runInContext(between(battle, '  function clearEnemyWarning(e) {', '  function updateEnemyTactic(')+between(battle, '  function rmvEnemy(e) {', '  function killEnemy(')+'\nglobalThis.removeEnemy=rmvEnemy;',box);
 const obj={geometry:{dispose(){throw Error('shared geometry disposed')}}},ice={};
 const enemy={obj,iceBox:ice,label:{},mats:Array.from({length:3},()=>({dispose(){disposed++}})),mixer:{stopAllAction(){stopped++},uncacheRoot(root){assert.equal(root,obj);uncached++}}};
 box.removeEnemy(enemy);assert.equal(stopped,1);assert.equal(uncached,1);assert.equal(disposed,3);assert.deepEqual(removed,[obj,ice]);assert.deepEqual(labels,[enemy.label]);assert.equal(enemy.mixer,null);assert.equal(enemy.iceBox,null);assert.equal(enemy.mats.length,0);
@@ -300,3 +300,27 @@ assert.equal(rh.first, 97); assert.equal(rh.e.hp, 96); assert.equal(rh.e.frozen,
 rh = reactHit('fire', { poison: { dps: 3, t: 4 } });
 assert.equal(rh.first, 96); assert.equal(rh.e.hp, 95); assert.equal(rh.e.poison, null); assert.equal(rh.S.reactions, 1);
 console.log('PASS: ice+iron shatter and poison+fire ignition formulas; actual hit handler consumes status and triggers once.');
+
+// Telegraphs lock a target, pause with the battle, and stop owning resources on removal.
+{
+const S = { now: 0, heroX: 1, heroZ: 3.4, over: false }; let hurts=0, warningsRemoved=0, warningDisposed=0;
+class Mesh { constructor(g,m){this.material=m;this.rotation={};this.position={set(){}};this.scale={set(){}};} }
+class Mat { dispose(){warningDisposed++;} }
+const box = vm.createContext({ S, Math, ctx:{norender:false}, THREE:{Mesh,MeshBasicMaterial:Mat,DoubleSide:2}, chargeWarningGeo:{},spellWarningGeo:{}, scene:{add(){},remove(){warningsRemoved++;}}, updBossBar(){},ring(){},hurtHero(){hurts++;} });
+vm.runInContext(between(battle,'  function clearEnemyWarning(e) {','  // ---- fx: particle bursts ----')+'\nglobalThis.qa={updateEnemyTactic,clearEnemyWarning};',box);
+const obj=()=>({position:{x:0}});
+const boss={type:'boss',z:-4,x:0,obj:obj(),intent:{stage:'idle',left:0}};
+assert.equal(box.qa.updateEnemyTactic(boss,.05),0);assert.equal(boss.intent.stage,'warn');assert.ok(boss.warning);assert.equal(boss.intent.x,1);
+S.heroX=-2;const saved=JSON.stringify(boss.intent);assert.equal(JSON.stringify(boss.intent),saved); // no tick means no timer progression
+for(let i=0;i<30;i++)box.qa.updateEnemyTactic(boss,.05);
+assert.equal(boss.intent.stage,'charge');assert.equal(boss.intent.x,1);assert.equal(boss.warning,null);
+assert.equal(box.qa.updateEnemyTactic(boss,.05),12);
+boss.z=boss.intent.endZ;assert.equal(box.qa.updateEnemyTactic(boss,.05),0);assert.equal(boss.intent.stage,'idle');
+const mage={type:'mage',x:0,z:-3,obj:obj(),intent:{stage:'idle',left:0}};
+box.qa.updateEnemyTactic(mage,.05);const tx=mage.intent.x;
+S.heroX=tx+1.5;for(let i=0;i<26;i++)box.qa.updateEnemyTactic(mage,.05);assert.equal(hurts,0); // dodge locked mark
+mage.intent={stage:'idle',left:0};box.qa.updateEnemyTactic(mage,.05);for(let i=0;i<26;i++)box.qa.updateEnemyTactic(mage,.05);assert.equal(hurts,1);
+mage.intent={stage:'idle',left:0};box.qa.updateEnemyTactic(mage,.05);box.qa.clearEnemyWarning(mage);box.qa.clearEnemyWarning(mage);assert.equal(warningsRemoved,4);assert.equal(warningDisposed,4);
+const rogue={type:'rogue',originX:2.3,id:4,x:2.3,obj:obj()};for(let i=0;i<100;i++){S.now=i*.1;box.qa.updateEnemyTactic(rogue,.1);assert.ok(Math.abs(rogue.x)<=2.4);}
+console.log('PASS: locked boss charge/mage ground mark, dodge versus hit, warning disposal once, bounded rogue sidesteps. Modeled, not natural difficulty testing.');
+}
