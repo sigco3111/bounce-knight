@@ -12,6 +12,8 @@ export async function startBase(ctx) {
   // ctx: { save, persist(), onSortie() }
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const scr = document.getElementById('screen-base');
+  // bind the sortie CTA before any model loads: the button is visible HTML and must never be dead on slow networks
+  document.getElementById('btn-sortie').onclick = () => ctx.onSortie();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -104,7 +106,6 @@ export async function startBase(ctx) {
     if (ctx.save.gold < c) { document.getElementById('bld-desc').textContent = '골드가 부족합니다!'; return; }
     ctx.save.gold -= c; ctx.save[b.key]++; ctx.persist(); upd();
   };
-  document.getElementById('btn-sortie').onclick = () => ctx.onSortie();
   upd();
 
   (function loop() { renderer.render(scene, camera); requestAnimationFrame(loop); })();
