@@ -1,3 +1,4 @@
+import { REGIONS } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
@@ -37,6 +38,7 @@ function doubleSide(root) {
 export async function startBattle(ctx) {
   // 적 모델을 전투 전에 준비: 진행 중 다운로드 실패로 보스가 누락되지 않게 한다.
   await Promise.all([...new Set(Object.values(ENEMY_DEFS).map(def => def.u))].map(url => loadModel(url, { poseT: false })));
+  const region = ctx.region || REGIONS[0], regionIndex = REGIONS.indexOf(region);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const panel = document.querySelector('#screen-battle > .panel');
@@ -58,8 +60,8 @@ export async function startBattle(ctx) {
   canvas.style.touchAction = 'none';
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0f16);
-  scene.fog = new THREE.Fog(0x0b0f16, 10, 26);
+  scene.background = new THREE.Color(region.sky);
+  scene.fog = new THREE.Fog(region.sky, 10, 26);
 
   const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 80);
   function frameCamera() {
@@ -132,7 +134,19 @@ export async function startBattle(ctx) {
       batch.computeBoundingSphere(); scene.add(batch);
     }
   }
+  if (regionIndex > 0) {
+    for (const tile of floorTiles) tile.traverse(o => {
+      if (!o.isMesh) return;
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      const next = ms.map(m => { const c = m.clone(); c.color?.lerp(new THREE.Color(region.color), 0.45); return c; });
+      o.material = Array.isArray(o.material) ? next : next[0];
+    });
+  }
   addStaticBatch(floorTiles);
+  if (regionIndex > 0) for (let i = 0; i < 8; i++) {
+    const pillar = new THREE.Mesh(regionIndex === 1 ? new THREE.DodecahedronGeometry(0.4, 0) : new THREE.ConeGeometry(0.35, 1.6, 4), new THREE.MeshStandardMaterial({ color: region.color, emissive: region.color, emissiveIntensity: 0.35, roughness: 0.8 }));
+    pillar.position.set(i % 2 ? 3.05 : -3.05, regionIndex === 1 ? 0.5 : 1, -7 + Math.floor(i / 2) * 2.2); scene.add(pillar);
+  }
   const wallPieces = [];
   for (let z = -8.9; z <= 4; z += 2.59) {
     const lw = (await loadModel('./models/d_wall.glb', { h: 2.7, x: -3.45, z, ry: Math.PI / 2 })).obj;
@@ -201,7 +215,7 @@ export async function startBattle(ctx) {
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
-    combo: 0, comboT: -99, reactions: 0,
+    combo: 0, comboT: -99, reactions: 0, region: region.id, victory: false, hazardTimer: 8, hazard: null,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -242,7 +256,7 @@ export async function startBattle(ctx) {
 
   // ---- enemies ----
   async function spawnEnemy(type, x, z) {
-    const def = ENEMY_DEFS[type];
+    const def = type === 'boss' && regionIndex === 1 ? { ...ENEMY_DEFS.boss, u: ENEMY_DEFS.mage.u, s: 1.25 } : ENEMY_DEFS[type];
     const m = await loadModel(def.u, { s: def.s, x, z, clone: true, poseT: Math.random(), animate: !ctx.norender, animation: 'Walking_D_Skeletons' });
     scene.add(m.obj);
     // per-enemy cloned materials so a hit flash never bleeds onto other enemies
@@ -253,9 +267,14 @@ export async function startBattle(ctx) {
         o.material = seen.get(o.material.uuid);
       }
     });
-    const hp = def.hp(S.wave);
+    if (type === 'boss' && regionIndex === 2) {
+      const crown = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.07, 6, 8), new THREE.MeshStandardMaterial({ color: 0xffd479, emissive: 0xd7842b, emissiveIntensity: 0.6 }));
+      crown.material.userData._e = 0xd7842b; crown.material.userData._ei = 0.6; mats.push(crown.material); crown.userData.personalGeometry = true; crown.rotation.x = Math.PI / 2; crown.position.y = m.h / def.s + 0.05; m.obj.add(crown);
+    }
+    const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2));
     const e = { originX: x, id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
+    if (S.over) { rmvEnemy(e); return null; }
     S.enemies.push(e); renderDirty = true; // async model completion may land while a dialog holds the view
     return e;
   }
@@ -336,6 +355,7 @@ export async function startBattle(ctx) {
     }
   }
   async function spawnRow(advance) {
+    if (S.over || S.wave >= 10) return;
     if (advance) S.wave++;
     const w = S.wave;
     if (advance && w % 5 === 0 && w % 10 !== 0) milestone(w); // boss waves pay on boss kill instead
@@ -347,7 +367,7 @@ export async function startBattle(ctx) {
       await spawnEnemy('boss', 0, -6.9);
       updBossBar();
       if (!ctx.norender) {
-        popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
+        popup(labelsC, innerWidth / 2, innerHeight * 0.26, `${region.boss} 등장!`, 'banner');
         bossFlash.classList.remove('on'); void bossFlash.offsetWidth; bossFlash.classList.add('on');
         burst(0, -6.9, 0xff3b30, 24, 5.5, 0.7, { sc: 1.6, vy0: 3, vyR: 3 });
         burst(0, -6.9, 0x3a1414, 10, 3, 0.5, { sc: 1.3, ttl0: 0.9, ttlR: 0.4 }); // dark smoke shards
@@ -391,6 +411,27 @@ export async function startBattle(ctx) {
     scene.remove(e.warning); e.warning.material.dispose(); e.warning = null;
   }
   function updateEnemyTactic(e, dt) {
+    if (e.type === 'boss' && regionIndex === 1) {
+      e.summonTimer = (e.summonTimer ?? 3) - dt;
+      if (e.summonTimer <= 0) {
+        e.summonTimer = 6;
+        if (S.enemies.length < 12) {
+          spawnEnemy('minion', Math.max(-2.4, e.x - 1.2), e.z + 0.5);
+          spawnEnemy('rogue', Math.min(2.4, e.x + 1.2), e.z + 0.5);
+          ring(e.x, e.z, 0x6cffff, 1.8, 0.8);
+          if (!ctx.norender) popup(labelsC, W() / 2, VH() * 0.26, '망령 증원 소환', 'banner');
+        }
+      }
+      return 0.35;
+    }
+    if (e.type === 'boss' && regionIndex === 2 && e.hp <= e.maxHp / 2) {
+      if (!e.enraged) {
+        e.enraged = true; clearEnemyWarning(e); e.intent = null;
+        if (!ctx.norender) popup(labelsC, W() / 2, VH() * 0.26, '황혼 군주 · 2단계', 'banner');
+      }
+      e.phaseTimer = (e.phaseTimer ?? 1) - dt;
+      if (e.phaseTimer <= 0) { e.phaseTimer = 4; startRegionHazard(true); }
+    }
     if (e.type === 'rogue') {
       e.x = Math.max(-2.4, Math.min(2.4, e.originX + Math.sin(S.now * 2.2 + e.id) * 0.65));
       e.obj.position.x = e.x;
@@ -400,7 +441,7 @@ export async function startBattle(ctx) {
     if (!e.intent) e.intent = { stage: 'idle', left: e.type === 'boss' ? 4 : 3.4 };
     const a = e.intent; a.left -= dt;
     if (a.stage === 'idle' && a.left <= 0) {
-      a.stage = 'warn'; a.left = e.type === 'boss' ? 1.4 : 1.2;
+      a.stage = 'warn'; a.left = e.type === 'boss' ? (e.enraged ? 0.9 : 1.4) : 1.2;
       a.x = S.heroX; a.z = S.heroZ;
       if (!ctx.norender) {
         const mat = new THREE.MeshBasicMaterial({ color: e.type === 'boss' ? 0xff4d55 : 0xc38aff, transparent: true, opacity: 0.6, depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide });
@@ -427,13 +468,43 @@ export async function startBattle(ctx) {
     } else if (a.stage === 'charge') {
       // Target is locked at warning time. Moving aside avoids the charge lane.
       const dx = a.x - e.x; e.x += Math.sign(dx) * Math.min(Math.abs(dx), 3 * dt); e.obj.position.x = e.x;
-      if (e.z >= a.endZ || a.left <= 0) { a.stage = 'idle'; a.left = 8; updBossBar(); return 0; }
+      if (e.z >= a.endZ || a.left <= 0) { a.stage = 'idle'; a.left = e.enraged ? 3 : 8; updBossBar(); return 0; }
       return 12;
     }
     if (a.stage === 'warn' && e.type === 'boss') {
       const dx = a.x - e.x; e.x += Math.sign(dx) * Math.min(Math.abs(dx), 2.5 * dt); e.obj.position.x = e.x;
     }
     return a.stage === 'warn' ? 0 : 1;
+  }
+
+  function startRegionHazard(phase = false) {
+    if (S.hazard || S.over) return;
+    const h = { x: S.heroX, z: S.heroZ, left: 1.6, phase };
+    if (!ctx.norender) {
+      const mat = new THREE.MeshBasicMaterial({ color: region.color, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+      h.mesh = new THREE.Mesh(regionIndex === 2 ? chargeWarningGeo : spellWarningGeo, mat);
+      h.mesh.rotation.x = -Math.PI / 2; h.mesh.renderOrder = 3;
+      if (regionIndex === 2) h.mesh.scale.set(6, 0.9, 1);
+      h.mesh.position.set(regionIndex === 2 ? 0 : h.x, 0.08, h.z); scene.add(h.mesh);
+    }
+    S.hazard = h;
+  }
+  function clearRegionHazard() {
+    if (S.hazard?.mesh) { scene.remove(S.hazard.mesh); S.hazard.mesh.material.dispose(); }
+    S.hazard = null;
+  }
+  function tickRegionHazard(dt) {
+    if (S.wave < 3) return;
+    S.hazardTimer -= dt;
+    if (S.hazardTimer <= 0) { S.hazardTimer = regionIndex === 1 ? 8 : 10; startRegionHazard(); }
+    const h = S.hazard; if (!h) return;
+    h.left -= dt;
+    if (h.left <= 0) {
+      const hit = regionIndex === 2 ? Math.abs(S.heroZ - h.z) < 0.55 : Math.hypot(S.heroX - h.x, S.heroZ - h.z) < 0.8;
+      clearRegionHazard();
+      ring(h.x, h.z, region.color, 1.2, 0.5);
+      if (hit) hurtHero(1, h.x, h.z);
+    }
   }
 
   // ---- fx: particle bursts ----
@@ -532,7 +603,7 @@ export async function startBattle(ctx) {
     el.classList.remove('hidden');
     const hp = Math.max(0, Math.ceil(boss.hp));
     boss.shownHP = hp;
-    el.querySelector('span').textContent = `미니보스 ${hp}/${boss.maxHp}` + (boss.intent?.stage === 'warn' ? ' · 돌진 준비' : boss.intent?.stage === 'charge' ? ' · 돌진' : '');
+    el.querySelector('span').textContent = `${region.boss} ${hp}/${boss.maxHp}` + (boss.intent?.stage === 'warn' ? ' · 돌진 준비' : boss.intent?.stage === 'charge' ? ' · 돌진' : '');
     el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', '미니보스 HP');
     el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', String(boss.maxHp)); el.setAttribute('aria-valuenow', String(hp));
     document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
@@ -542,6 +613,7 @@ export async function startBattle(ctx) {
     if (e.mixer) { e.mixer.stopAllAction(); e.mixer.uncacheRoot(e.obj); e.mixer = null; }
     if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; }
     clearEnemyWarning(e);
+    e.obj.traverse?.(o => { if (o.userData?.personalGeometry) o.geometry.dispose(); });
     for (const mat of e.mats || []) mat.dispose(); // 적별 복제 재질만 해제. 공유 모델 지오메트리/텍스처는 유지
     e.mats = [];
     labels.remove(e.label);
@@ -575,7 +647,8 @@ export async function startBattle(ctx) {
         delayFx(0.3, () => ring(e.x, e.z, 0xffffff, 1.1, 0.4));
         burst(e.x, e.z, 0x3a1414, 12, 3.4, 0.6, { sc: 1.4, ttl0: 0.9, ttlR: 0.4 });
       }
-      milestone(S.wave, true); // boss gate: wave-clear reward lands when the boss actually falls
+      milestone(S.wave, true);
+      S.victory = true; gameOver(); // each region is a finite ten-wave expedition
     }
     updHud();
   }
@@ -692,21 +765,23 @@ export async function startBattle(ctx) {
   });
   function gameOver() {
     if (S.over) return;
-    S.over = true; S.phase = 'over'; clearControls();
+    S.over = true; S.phase = 'over'; clearControls(); clearRegionHazard();
+    for (const e of S.enemies) clearEnemyWarning(e);
+    document.getElementById('over-ttl').textContent = S.victory ? `${region.name} 정복!` : '원정 종료';
     blip(200, 0.3, 'sawtooth', 0.055, 1);
     setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05, 1), 170);
-    document.getElementById('over-dsc').textContent = `도달 웨이브 ${S.wave} · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
+    document.getElementById('over-dsc').textContent = `${region.name} ${S.wave}/10 · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
     const plan = nextExpeditionPlan({ ...ctx.save, bestWave: Math.max(ctx.save.bestWave, S.wave) }, S.gold);
     const temporary = ctx.isSessionOnly?.();
     document.getElementById('over-plan').textContent = temporary
       ? '임시 진행은 기지 복귀 시 초기화됩니다.\n기존 저장 원본은 변경하지 않습니다.'
-      : `귀환 후 ${plan.gold}골드 · 다음 목표 웨이브 ${plan.target}\n추천 ${plan.name}: ${plan.benefit}\n비용 ${plan.cost} · ${plan.shortage ? plan.shortage + '골드 더 모으기' : '귀환 후 강화 가능'}\n공·패시브는 이번 원정만, 기지 강화는 유지`;
+      : `귀환 후 ${plan.gold}골드 · ${S.victory ? (REGIONS[regionIndex + 1] ? REGIONS[regionIndex + 1].name + ' 해금' : '세 지역 정복 완료') : region.name + ' 재도전'}\n추천 ${plan.name}: ${plan.benefit}\n비용 ${plan.cost} · ${plan.shortage ? plan.shortage + '골드 더 모으기' : '귀환 후 강화 가능'}\n공·패시브는 이번 원정만, 기지 강화는 유지`;
     document.getElementById('ov-over').classList.remove('hidden');
     document.getElementById('btn-tobase').focus({ preventScroll: true });
     const finish = () => {
       if (S.phase === 'done') return; // 중복 클릭/자동 복귀가 원정 보상을 두 번 더하지 않게
       S.phase = 'done';
-      ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills });
+      ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills, victory: S.victory, region: region.id });
     };
     document.getElementById('btn-tobase').onclick = finish;
     if (ctx.auto) setTimeout(finish, 1500);
@@ -725,7 +800,7 @@ export async function startBattle(ctx) {
   });
   function updHud() {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
-    document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave) + (bossAlive ? ' · 보스' : '');
+    document.getElementById('bt-wave').textContent = region.name + ' ' + Math.max(1, S.wave) + '/10' + (bossAlive ? ' · 보스' : '');
     const pb = [];
     if (S.reactions) pb.push('연계 ' + S.reactions);
     if (S.dmgMul > 1) pb.push('공격+' + Math.round((S.dmgMul - 1) * 100) + '%');
@@ -755,7 +830,7 @@ export async function startBattle(ctx) {
         `<span class="ball-chip" data-count="${count}" aria-label="${ballName(b)} ${count}개"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}${count > 1 ? ' ×' + count : ''}</span>`).join('');
     }
   }
-  document.getElementById('bt-hint').textContent = '왼쪽 드래그: 이동 · 오른쪽 드래그: 조준 (공은 자동 발사)';
+  document.getElementById('bt-hint').textContent = region.tip;
 
   // ---- input: 왼쪽 절반=이동, 오른쪽 절반=조준 (멀티터치) ----
   const ray = new THREE.Raycaster();
@@ -888,6 +963,7 @@ export async function startBattle(ctx) {
   // ---- physics & real-time sim ----
   function step(dt) {
     if (S.phase !== 'play') return;
+    tickRegionHazard(dt); if (S.over) return;
     // hero movement
     const prevHeroX = S.heroX, prevHeroZ = S.heroZ;
     if (S.moveTarget) {
@@ -1059,6 +1135,7 @@ export async function startBattle(ctx) {
         S.enemies = S.enemies.filter(x => x !== e);
         rmvEnemy(e);
         hurtHero(e.type === 'boss' ? 3 : e.type === 'warrior' ? 2 : 1, e.x, DANGER_Z);
+        if (e.type === 'boss') gameOver();
         if (S.over) return;
         continue; // 경계에서 이미 제거/피해 처리한 적은 접촉 피해를 다시 주지 않는다.
       }
@@ -1067,6 +1144,7 @@ export async function startBattle(ctx) {
         S.enemies = S.enemies.filter(x => x !== e);
         rmvEnemy(e);
         hurtHero(1, e.x, e.z);
+        if (e.type === 'boss') gameOver();
         if (S.over) return;
       }
     }
@@ -1157,7 +1235,7 @@ export async function startBattle(ctx) {
     }
     S.fcount++;
     document.getElementById('state').textContent = JSON.stringify({
-      phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
+      region: region.id, victory: S.victory, phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
       enemies: S.enemies.length, balls: S.balls.length, gems: S.gems.length, gemsGot: S.gemsGot,
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
@@ -1206,4 +1284,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+  }
