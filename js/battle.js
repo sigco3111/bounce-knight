@@ -101,8 +101,8 @@ export async function startBattle(ctx) {
   const btl = new THREE.PointLight(0xff8c3a, 20, 10, 2); btl.position.set(0, 2.1, BACK + 0.8); scene.add(btl);
 
   // breach boundary telegraph: pulsing red line at DANGER_Z
-  const dl = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 0.22), new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.6 }));
-  dl.rotation.x = -Math.PI / 2; dl.position.set(0, 0.02, DANGER_Z); scene.add(dl);
+  const dl = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 0.22), new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.75 }));
+  dl.rotation.x = -Math.PI / 2; dl.position.set(0, 0.06, DANGER_Z); scene.add(dl);
   const hitFlash = document.createElement('div');
   hitFlash.id = 'hit-flash';
   labelsC.parentElement.appendChild(hitFlash);
@@ -498,7 +498,7 @@ export async function startBattle(ctx) {
       spawnRow(!bossAlive);
     }
     // gems
-    dl.material.opacity = 0.32 + 0.3 * Math.abs(Math.sin(S.t * 3)); // telegraph pulse
+    dl.material.opacity = 0.45 + 0.3 * Math.abs(Math.sin(S.t * 3)); // telegraph pulse
     for (const g of [...S.gems]) {
       g.ttl -= dt;
       g.mesh.rotation.y += dt * 3;
