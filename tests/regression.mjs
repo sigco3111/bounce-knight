@@ -278,7 +278,7 @@ console.log('PASS: unreachable front-row drop enters reachable lane and awards e
 
 // Combinations consume a prior status, rather than becoming a permanent damage buff.
 const reactionBox = vm.createContext({});
-vm.runInContext(common.slice(common.indexOf('export function ballReaction')).replace('export ', '') + '\nglobalThis.react=ballReaction;', reactionBox);
+vm.runInContext(common.slice(common.indexOf('export function ballReaction')).replaceAll('export ', '') + '\nglobalThis.react=ballReaction;', reactionBox);
 assert.equal(reactionBox.react(ball('iron'), { frozen: 1 }).damage, 2);
 assert.equal(reactionBox.react(ball('iron', 1, true), { frozen: 1 }).damage, 4);
 assert.equal(reactionBox.react(ball('iron'), { frozen: 0 }), null);
@@ -323,4 +323,16 @@ mage.intent={stage:'idle',left:0};box.qa.updateEnemyTactic(mage,.05);for(let i=0
 mage.intent={stage:'idle',left:0};box.qa.updateEnemyTactic(mage,.05);box.qa.clearEnemyWarning(mage);box.qa.clearEnemyWarning(mage);assert.equal(warningsRemoved,4);assert.equal(warningDisposed,4);
 const rogue={type:'rogue',originX:2.3,id:4,x:2.3,obj:obj()};for(let i=0;i<100;i++){S.now=i*.1;box.qa.updateEnemyTactic(rogue,.1);assert.ok(Math.abs(rogue.x)<=2.4);}
 console.log('PASS: locked boss charge/mage ground mark, dodge versus hit, warning disposal once, bounded rogue sidesteps. Modeled, not natural difficulty testing.');
+}
+
+// Base/return previews use earned gold but never mutate or purchase anything.
+{
+const box=vm.createContext({Math});
+vm.runInContext(common.slice(common.indexOf('export function nextExpeditionPlan')).replace('export ','')+'\nglobalThis.plan=nextExpeditionPlan;',box);
+const save={gold:40,castleLv:2,forgeLv:1,tavernLv:1,bestWave:7}; const before=JSON.stringify(save);
+const p=box.plan(save,37);assert.equal(p.target,10);assert.equal(p.name,'대장간');assert.equal(p.gold,77);assert.equal(p.cost,60);assert.equal(p.shortage,0);assert.equal(JSON.stringify(save),before);
+assert.equal(box.plan({...save,gold:0}).shortage,60);
+assert.equal(box.plan({...save,bestWave:10}).target,15);
+assert.equal(box.plan({gold:120,castleLv:1,forgeLv:1,tavernLv:1,bestWave:0}).name,'성');
+console.log('PASS: next-run goal/upgrade preview matches milestone, gold, cost, shortage and effect; no save mutation or purchase.');
 }
