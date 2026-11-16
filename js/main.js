@@ -1,4 +1,4 @@
-import { REGIONS, regionOpen, regionClear, validRegionProgress, selectedKnight, validKnight } from './content.js';
+import { REGIONS, regionOpen, regionClear, validRegionProgress, selectedKnight, validKnight, selectedRoute, validRoute, selectedContract, validContract, validRelicProgress, mergeDiscoveries } from './content.js';
 import { startBase } from './base.js';
 import { startBattle } from './battle.js';
 
@@ -17,7 +17,7 @@ try {
 const defaults = () => ({ gold: 120, castleLv: 1, forgeLv: 1, tavernLv: 1, bestWave: 0 });
 const saveFields = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
 const validSave = o => o && typeof o === 'object' && !Array.isArray(o) &&
-  saveFields.every(k => Number.isSafeInteger(o[k]) && o[k] >= (k.endsWith('Lv') ? 1 : 0)) && validRegionProgress(o.clearedRegions) && validKnight(o.selectedKnight);
+  saveFields.every(k => Number.isSafeInteger(o[k]) && o[k] >= (k.endsWith('Lv') ? 1 : 0)) && validRegionProgress(o.clearedRegions) && validKnight(o.selectedKnight) && validRoute(o.selectedRoute) && validContract(o.selectedContract) && validRelicProgress(o.discoveredRelics);
 const rawSave = storage.getItem(SAVE_KEY);
 let save = defaults(), sessionOnly = !storageAvailable;
 if (rawSave !== null) {
@@ -103,7 +103,7 @@ async function showBattle(regionIndex = selectedRegion) {
   document.getElementById('ov-levelup').classList.add('hidden');
   try { await startBattle({
     save,
-    region: REGIONS[selectedRegion], regionIndex: selectedRegion, knight: selectedKnight(save),
+    region: REGIONS[selectedRegion], regionIndex: selectedRegion, knight: selectedKnight(save), route: selectedRoute(save), contract: selectedContract(save),
     isSessionOnly: () => sessionOnly,
     dmgMul: () => 1 + (save.forgeLv - 1) * 0.2,
     heroMaxHP: () => 3 + save.castleLv - 1,
@@ -112,6 +112,7 @@ async function showBattle(regionIndex = selectedRegion) {
     onEnd: (res) => {
       save.gold += res.gold;
       save.bestWave = Math.max(save.bestWave, res.wave);
+      save.discoveredRelics = mergeDiscoveries(save, res.discoveries || []);
       if (res.victory) save.clearedRegions = regionClear(save, res.region);
       persist();
       if (auto) {
