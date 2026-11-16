@@ -36,6 +36,7 @@ function doubleSide(root) {
 export async function startBattle(ctx) {
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const panel = document.querySelector('#screen-battle > .panel');
+  const topHud = document.querySelector('#screen-battle > .hud-top');
   const VH = () => Math.max(1, H() - (panel?.offsetHeight || 120) - 4); // 모든 화면에서 전투 영역은 HUD 위까지만
   const scr = document.getElementById('screen-battle');
   const labelsC = document.getElementById('bt-labels');
@@ -67,6 +68,9 @@ export async function startBattle(ctx) {
   };
   window.addEventListener('resize', fitViewport);
   if (panel) new ResizeObserver(fitViewport).observe(panel);
+  const fitBossBar = () => { document.getElementById('bt-bossbar').style.top = ((topHud?.offsetHeight || 64) + 2) + 'px'; };
+  if (topHud) new ResizeObserver(fitBossBar).observe(topHud);
+  fitBossBar();
   frameCamera();
 
   scene.add(new THREE.AmbientLight(0x5d6d96, 1.4));
@@ -930,4 +934,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+            }
