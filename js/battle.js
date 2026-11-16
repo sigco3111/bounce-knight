@@ -1,4 +1,4 @@
-import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice } from './content.js';
+import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice, KNIGHTS } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, BASE_ELEMENTS, crossFusion, ballHas, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
@@ -39,6 +39,7 @@ export async function startBattle(ctx) {
   // 적 모델을 전투 전에 준비: 진행 중 다운로드 실패로 보스가 누락되지 않게 한다.
   await Promise.all([...new Set(Object.values(ENEMY_DEFS).map(def => def.u))].map(url => loadModel(url, { poseT: false })));
   const region = ctx.region || REGIONS[0], regionIndex = REGIONS.indexOf(region);
+  const knight = ctx.knight || KNIGHTS[0], statusScale = knight.status;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const panel = document.querySelector('#screen-battle > .panel');
@@ -210,12 +211,12 @@ export async function startBattle(ctx) {
   const S = {
     phase: 'play', wave: 0, kills: 0, gold: 0, xp: 0, level: 1,
     heroHP: ctx.heroMaxHP(), heroX: 0, heroZ: HERO_Z,
-    inventory: [0, 1, 2].map(() => ({ type: 'iron', lv: 1, evolved: false })),
+    inventory: knight.start.map(type => ({ type, lv: 1, evolved: false })),
     dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [], parts: [], fxQueue: [], rings: [],
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
-    combo: 0, comboT: -99, reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
+    combo: 0, comboT: -99, shieldSpent: false, reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -544,7 +545,7 @@ export async function startBattle(ctx) {
       scene.add(trail);
     }
     const a = S.aimDir;
-    S.balls.push({ def: bdef, mesh, trail, trailPts, x: S.heroX, z: S.heroZ, vx: Math.sin(a) * SPEED, vz: -Math.cos(a) * SPEED, lastHit: new Map() });
+    S.balls.push({ def: bdef, mesh, trail, trailPts, x: S.heroX, z: S.heroZ, vx: Math.sin(a) * SPEED * knight.speed, vz: -Math.cos(a) * SPEED * knight.speed, lastHit: new Map() });
     blip(520 + Math.random() * 80, 0.05, 'square', 0.02);
   }
 
@@ -574,10 +575,10 @@ export async function startBattle(ctx) {
       const rad = src.def.evolved ? 1.4 : 0.95, sd = Math.max(1, Math.ceil(dmg / 2));
       for (const o of S.enemies) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < rad) { o.hp -= sd; updEnemyLabel(o); }
     } else if (ballHas(src.def, 'ice')) {
-      e.frozen = src.def.evolved ? 3 : 1.5;
+      e.frozen = (src.def.evolved ? 3 : 1.5) * statusScale;
     } else if (ballHas(src.def, 'poison')) {
-      const dur = src.def.evolved ? 4 : 2.5, tot = ballDmg(src.def) * (src.def.evolved ? 2.5 : 1);
-      const dps = tot / dur; // 지속 피해: 총량은 공 위력 비례, 진화 시 더 오래 더 강하게
+      const dur = (src.def.evolved ? 4 : 2.5) * statusScale, tot = ballDmg(src.def) * (src.def.evolved ? 2.5 : 1);
+      const dps = tot / (dur / statusScale); // 지속 피해: 총량은 공 위력 비례, 진화 시 더 오래 더 강하게
       if (!e.poison || e.poison.dps <= dps) e.poison = { dps, t: dur, acc: 0 };
       else e.poison.t = Math.max(e.poison.t, dur);
     } else if (ballHas(src.def, 'bolt')) {
@@ -670,6 +671,11 @@ export async function startBattle(ctx) {
   }
 
   function hurtHero(dmg, ex, ez) {
+    if (knight.id === 'guardian' && !S.shieldSpent) {
+      S.shieldSpent = true; dmg = Math.max(0, dmg - 1);
+      if (!ctx.norender) popup(labelsC, W() / 2, VH() * 0.6, '수호 방패 · 피해 1 방어', 'banner');
+      if (!dmg) { updHud(); return; }
+    }
     S.heroHP -= dmg;
     S.shake = Math.max(S.shake || 0, 0.45);
     hitFlash.classList.remove('on'); void hitFlash.offsetWidth; hitFlash.classList.add('on');
@@ -861,6 +867,7 @@ export async function startBattle(ctx) {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
     document.getElementById('bt-wave').textContent = region.name + ' ' + Math.max(1, S.wave) + '/10' + (bossAlive ? ' · 보스' : '');
     const pb = [];
+    pb.push(knight.short + (knight.id === 'guardian' && !S.shieldSpent ? ' · 방패' : ''));
     if (S.reactions) pb.push('연계 ' + S.reactions);
     if (S.dmgMul > 1) pb.push('공격+' + Math.round((S.dmgMul - 1) * 100) + '%');
     if (S.fireMul < 1) pb.push('연사x' + Math.round(Math.log(S.fireMul) / Math.log(0.85)));
@@ -1299,7 +1306,7 @@ export async function startBattle(ctx) {
     }
     S.fcount++;
     document.getElementById('state').textContent = JSON.stringify({
-      region: region.id, victory: S.victory, phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
+      region: region.id, knight: knight.id, victory: S.victory, phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
       enemies: S.enemies.length, balls: S.balls.length, gems: S.gems.length, gemsGot: S.gemsGot,
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
@@ -1348,4 +1355,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                           }
+}
