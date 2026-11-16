@@ -5,9 +5,22 @@ const SAVE_KEY = 'bounceknight_save_v1'; // unique under sigco3111.github.io (or
 const OLD_KEY = 'bb_save_v1';
 const storage = (() => { try { const t = '__bb_t'; localStorage.setItem(t, '1'); localStorage.removeItem(t); return localStorage; } catch (e) { const mem = {}; return { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } }; } })();
 let save = JSON.parse(storage.getItem(SAVE_KEY) || 'null');
-if (!save) { // one-time migration from the old generic key
+if (!save) {
+  // One-time migration from the old generic key. This origin is shared with
+  // other games, so import only when the value matches this game's exact save
+  // schema, and never delete the old key (it may belong to another game).
   const old = storage.getItem(OLD_KEY);
-  if (old) { save = JSON.parse(old); storage.setItem(SAVE_KEY, old); storage.removeItem(OLD_KEY); }
+  if (old) {
+    try {
+      const o = JSON.parse(old);
+      const F = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
+      if (o && typeof o === 'object' && !Array.isArray(o)
+          && F.every(k => typeof o[k] === 'number') && Object.keys(o).every(k => F.includes(k))) {
+        save = o;
+        storage.setItem(SAVE_KEY, JSON.stringify(o));
+      }
+    } catch (e) { /* not this game's save; leave it untouched */ }
+  }
 }
 save = save || {
   gold: 120, castleLv: 1, forgeLv: 1, tavernLv: 1, bestWave: 0,
