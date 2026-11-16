@@ -100,6 +100,7 @@ async function showBattle() {
   document.getElementById('ov-levelup').classList.add('hidden');
   try { await startBattle({
     save,
+    isSessionOnly: () => sessionOnly,
     dmgMul: () => 1 + (save.forgeLv - 1) * 0.2,
     heroMaxHP: () => 3 + save.castleLv - 1,
     extraBalls: () => save.tavernLv,
