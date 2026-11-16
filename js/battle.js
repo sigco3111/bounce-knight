@@ -5,7 +5,7 @@ import { loadModel, HtmlLabels, popup, blip, BALL_TYPES, EVOLVED, ballName, ball
 // - 영웅이 전장 아래를 자유롭게 이동, 공은 자동 연사 스트림(인벤토리만큼 동시 비행)
 // - 조준은 오른쪽 드래그, 이동은 왼쪽 드래그(분리된 두 입력)
 // - 적은 실시간으로 아래로 행진, 아래 경계 도달/영웅 접촉 시 피해
-// - 처치 시 XP 젬 드롭 → 영웅이 가까이 가면 자동 수집 → 레벨업 3지선다(새 공/강화/융합)
+// - 처치 시 XP 젬 드롭 → 영웅이 가까이 가면 자동 수집 → 레벨업 4장 중 하나 선택(새 공 2/강화·융합 1/패시브 1)
 
 const AX = 3.0;            // 옆벽 안쪽 면
 const BACK = -7.6;         // 뒷벽 면
@@ -811,7 +811,6 @@ export async function startBattle(ctx) {
       spawnRow(!bossAlive);
     }
     // gems
-    if (!ctx.norender) { const dp = proj(new THREE.Vector3(0, 0.05, DANGER_Z)); dlEl.style.top = dp.y + 'px'; } // telegraph pulse
     for (const g of [...S.gems]) {
       g.ttl -= dt;
       g.mesh.rotation.y += dt * 3;
@@ -851,6 +850,14 @@ export async function startBattle(ctx) {
       camera.position.set(followX + (Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
     } else { S.shake = 0; camera.position.set(followX, 12.9, 12.2); }
     camera.updateMatrixWorld(true);
+    if (!ctx.norender) { // 실제 전장 너비만 표시. 카메라 추적/흔들림 후 같은 좌표계로 투영
+      const a = proj(new THREE.Vector3(-AX, 0.05, DANGER_Z));
+      const b = proj(new THREE.Vector3(AX, 0.05, DANGER_Z));
+      const left = Math.max(0, a.x), right = Math.min(W(), b.x);
+      dlEl.style.left = left + 'px';
+      dlEl.style.width = Math.max(0, right - left) + 'px';
+      dlEl.style.top = ((a.y + b.y) * 0.5) + 'px';
+    }
     if (!ctx.norender || S.fcount % 30 === 0) {
       const placed = [];
       for (const e of [...S.enemies].sort((a, b2) => a.x - b2.x)) {
@@ -908,4 +915,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+          }
