@@ -258,3 +258,20 @@ console.log('PASS exact FX tick: 1000 simultaneous expirations, stable live entr
   } finally { process.off('unhandledRejection', onRejected); }
   console.log('PASS: denied modeled audio resumes do not leak asynchronous errors. Not a device permission or listening test.');
 }
+
+// Front-row gems must reach a lane the hero can enter, with no XP/radius buff.
+const gemTick = between(battle, '    // gems\n', '\n  // ---- main loop ----');
+function gemReach(z, heroZ = -2.6) {
+  const position = { y: 0, z, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
+  const g = { x: 0, z, ttl: 12, mesh: { rotation: { y: 0 }, position, scale: { setScalar() {} } } };
+  const S = { gems: [g], heroX: 0, heroZ, now: 0, xp: 0, gemsGot: 0 };
+  const box = vm.createContext({ S, HERO_Z_MIN: -2.6, Math, dt: 0.05, scene: { remove() {} }, ring() {}, blip() {}, updHud() {}, xpNeed: () => 7, levelUp() {} });
+  // The last brace in this boundary closes step(), not the gem loop.
+  const code = gemTick.slice(0, gemTick.lastIndexOf('\n  }'));
+  for (let i = 0; i < 200 && S.gems.length; i++) vm.runInContext("(()=>{" + code + "})()", box);
+  return S;
+}
+assert.equal(gemReach(-7.2).gemsGot, 1);
+assert.equal(gemReach(-7.2).xp, 1);
+assert.equal(gemReach(0, 3.4).xp, 0); // ordinary distant drops are not globally auto-collected
+console.log('PASS: unreachable front-row drop enters reachable lane and awards exactly one XP; ordinary pickup range unchanged.');
