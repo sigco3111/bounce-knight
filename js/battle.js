@@ -477,12 +477,12 @@ export async function startBattle(ctx) {
     for (const mat of e.mats || []) mat.dispose(); // 적별 복제 재질만 해제. 공유 모델 지오메트리/텍스처는 유지
     e.mats = [];
     labels.remove(e.label);
+    if (e.type === 'boss') updBossBar(); // defeat, boundary breach and hero contact all remove its HP bar
   }
   function killEnemy(e, kc = 0xffd76a) { // 처치 파편은 죽인 공 타입 색(기본 금색): 처치 주체가 색으로 읽힘
     S.enemies = S.enemies.filter(x => x !== e);
     rmvEnemy(e);
     S.kills++;
-    if (e.type === 'boss') updBossBar();
     const bsc = e.type === 'boss' ? 1.7 : 1;
     burst(e.x, e.z, kc, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
     burst(e.x, e.z, 0xfff6dd, e.type === 'boss' ? 8 : 5, 2.5, 0.9, { sc: bsc });
@@ -1124,4 +1124,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+}
