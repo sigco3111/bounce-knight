@@ -544,7 +544,7 @@ export async function startBattle(ctx) {
     return null;
   }
   function levelUp() {
-    S.phase = 'levelup'; clearControls(); S.level++;
+    S.phase = 'levelup'; scr.classList.add('choice-dialog-open'); clearControls(); S.level++;
     // 네 장: 서로 다른 새 공 2종 / 융합 우선 또는 강화 / 패시브
     const elements = ['fire', 'ice', 'bolt', 'poison'];
     for (let i = elements.length - 1; i > 0; i--) {
@@ -616,7 +616,7 @@ export async function startBattle(ctx) {
   }
   function afterLevelUp() {
     if (S.xp >= xpNeed()) return levelUp();
-    S.phase = 'play';
+    S.phase = 'play'; scr.classList.remove('choice-dialog-open');
   }
 
   document.getElementById('ov-over').addEventListener('keydown', e => {
@@ -1124,4 +1124,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-          }
+      }
