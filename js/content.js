@@ -86,9 +86,9 @@ export function contractProgress(contract, state) {
 
 // Enemy field guide: fixed encounters guarantee each mechanic appears in an expedition.
 export const ENEMY_GUIDE = [
-  { id: 'shield', name: '방패병', wave: 3, color: 0x6daeff, desc: '정면 직격을 1 줄입니다(최소 0). 뒤에서 튕겨 맞히거나 관통구로 우회하세요. 동결 중에는 방패가 내려갑니다. 상태 효과는 적용됩니다.' },
+  { id: 'shield', name: '방패병', wave: 3, color: 0x6daeff, desc: '2초 방어 뒤 1.5초 빈틈. 방어 중 정면 직격을 1 줄입니다(최소 0). 뒤에서 튕겨 맞히거나 관통구로 우회하세요. 동결 중에는 방패가 내려갑니다. 상태 효과는 적용됩니다.' },
   { id: 'healer', name: '치유 사제', wave: 5, color: 0x80ffc4, desc: '4초마다 2칸 안의 다른 적 HP를 1 회복합니다. 최대 HP를 넘지 않습니다. 얼리면 회복 주기도 멈춥니다.' },
   { id: 'volatile', name: '폭발 운반병', wave: 7, color: 0xffa25b, desc: '처치하면 그 자리에 1.5초 예고 뒤 반경 1.1 폭발, 영웅 피해 1. 원 밖으로 피하세요. 접촉·경계 이탈 때는 폭발하지 않습니다.' },
 ];
 export const specialEnemyAt = wave => ENEMY_GUIDE.find(e => e.wave === wave)?.id;
-export const shieldDirect = (enemy, projectile, damage, piercing) => enemy.type === 'shield' && enemy.frozen <= 0 && !piercing && projectile.z > enemy.z ? Math.max(0, damage - 1) : damage;
+export const shieldDirect = (enemy, projectile, damage, piercing) => enemy.type === 'shield' && !enemy.guardOpen && enemy.frozen <= 0 && !piercing && projectile.z > enemy.z ? Math.max(0, damage - 1) : damage;
