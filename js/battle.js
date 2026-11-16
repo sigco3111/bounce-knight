@@ -410,12 +410,12 @@ export async function startBattle(ctx) {
     for (const c of picks) {
       let ic, t1, t2;
       // 선택지 카드에 결과 수치를 미리 보여줘 비교 선택이 되게 (batch 17)
-      if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc + ` 적중 피해 ${ballDmg({ lv: 1, evolved: false })}`; }
-      else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = `적중 피해 ${ballDmg(c.ball)} → ${ballDmg({ lv: c.ball.lv + 1, evolved: c.ball.evolved })}`; }
+      if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc + ` 기본 적중 피해 ${ballDmg({ lv: 1, evolved: false })}`; }
+      else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = `기본 적중 피해 ${ballDmg(c.ball)} → ${ballDmg({ lv: c.ball.lv + 1, evolved: c.ball.evolved })}`; }
       else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = `모든 공 피해량 ×${S.dmgMul.toFixed(1)} → ×${(S.dmgMul + 0.2).toFixed(1)}`; }
       else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = `발사 주기 ${(FIRE_INTERVAL * S.fireMul).toFixed(2)}초 → ${(FIRE_INTERVAL * S.fireMul * 0.85).toFixed(2)}초 (최대 3회 중첩)`; }
       else if (c.kind === 'life') { ic = '#ff7a9d'; t1 = '패시브: 수호 심장'; t2 = `HP ${S.heroHP} → ${Math.min(5, S.heroHP + 1)} (최대 5)`; }
-      else { const flv = c.pair[0].lv; ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + flv; t2 = EVOLVED[c.pair[0].type].desc + ` 적중 피해 ${ballDmg({ lv: flv, evolved: true })} (기존 각 ${flv}) · 공 2개 → 1개`; }
+      else { const flv = c.pair[0].lv; ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + flv; t2 = EVOLVED[c.pair[0].type].desc + ` 기본 적중 피해 ${ballDmg({ lv: flv, evolved: true })} (기존 각 ${flv}) · 공 2개 → 1개`; }
       const d = document.createElement('div');
       d.className = 'card-pick';
       d.innerHTML = `<div class="ic" style="background:${ic}"></div><div><div class="t1">${t1}</div><div class="t2">${t2}</div></div>`;
@@ -629,6 +629,10 @@ export async function startBattle(ctx) {
       } else { // 상태 이상을 적 본체 색으로 표시: 동결=얼음빛, 중독=녹색 기운 (타격 플래시가 우선)
         const tint = e.frozen > 0 ? 0x2a6a9f : e.poison ? 0x54c22e : 0; // 중독은 어두운 장면에서도 읽히게 밝은 연두
         for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(tint || mt.userData._e); mt.emissiveIntensity = tint ? (e.poison && !e.frozen ? 0.85 : 0.6) : mt.userData._ei; } }
+      }
+      if (e.type === 'boss' && !ctx.norender) { // 보스 맥동+위협 고리: 살아있는 동안 위압감 표시
+        e.obj.scale.setScalar(e.def.s * (1 + 0.06 * Math.sin(S.now * 4)));
+        e.auraT = (e.auraT || 0) - dt; if (e.auraT <= 0) { e.auraT = 0.55; ring(e.x, e.z, 0xff3b30, 1.6, 0.55); }
       }
       if (e.poison) { // 중독 지속 피해
         e.poison.t -= dt;
