@@ -21,10 +21,10 @@ const SPAWN_INTERVAL = 6.5;
 const MARCH_SPEED = 0.32;  // 초당 전진
 
 const ENEMY_DEFS = {
-  minion:  { u: './models/Skeleton_Minion.glb',  s: 0.7, hp: w => Math.round(2 + w * 0.6),  gold: 3, xp: 1, spd: 1.0 },
-  rogue:   { u: './models/Skeleton_Rogue.glb',   s: 0.7, hp: w => Math.round(3 + w * 0.7),  gold: 4, xp: 1, spd: 1.25 },
-  mage:    { u: './models/Skeleton_Mage.glb',    s: 0.7, hp: w => Math.round(3 + w * 0.8),  gold: 5, xp: 2, spd: 0.9 },
-  warrior: { u: './models/Skeleton_Warrior.glb', s: 0.7, hp: w => Math.round(8 + w * 1.2),  gold: 9, xp: 2, spd: 0.65 },
+  minion:  { u: './models/29-Skeleton_Minion.glb',  s: 0.7, hp: w => Math.round(2 + w * 0.6),  gold: 3, xp: 1, spd: 1.0 },
+  rogue:   { u: './models/30-Skeleton_Rogue.glb',   s: 0.7, hp: w => Math.round(3 + w * 0.7),  gold: 4, xp: 1, spd: 1.25 },
+  mage:    { u: './models/28-Skeleton_Mage.glb',    s: 0.7, hp: w => Math.round(3 + w * 0.8),  gold: 5, xp: 2, spd: 0.9 },
+  warrior: { u: './models/31-Skeleton_Warrior.glb', s: 0.7, hp: w => Math.round(8 + w * 1.2),  gold: 9, xp: 2, spd: 0.65 },
 };
 
 function doubleSide(root) {
@@ -99,7 +99,7 @@ export async function startBattle(ctx) {
   }
   const btl = new THREE.PointLight(0xff8c3a, 20, 10, 2); btl.position.set(0, 2.1, BACK + 0.8); scene.add(btl);
 
-  const hero = (await loadModel('./models/Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
+  const hero = (await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
   scene.add(hero);
 
   // ---- game state ----
