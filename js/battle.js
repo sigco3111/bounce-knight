@@ -25,6 +25,7 @@ const ENEMY_DEFS = {
   rogue:   { u: './models/30-Skeleton_Rogue.glb',   s: 0.7, hp: w => Math.round(3 + w * 0.7),  gold: 4, xp: 1, spd: 1.25 },
   mage:    { u: './models/28-Skeleton_Mage.glb',    s: 0.7, hp: w => Math.round(3 + w * 0.8),  gold: 5, xp: 2, spd: 0.9 },
   warrior: { u: './models/31-Skeleton_Warrior.glb', s: 0.7, hp: w => Math.round(8 + w * 1.2),  gold: 9, xp: 2, spd: 0.65 },
+  boss:    { u: './models/31-Skeleton_Warrior.glb', s: 1.15, hp: w => Math.round((8 + w * 1.2) * 3), gold: 30, xp: 6, spd: 0.45 },
 };
 
 function doubleSide(root) {
@@ -169,6 +170,13 @@ export async function startBattle(ctx) {
       if (healed) S.heroHP++;
       if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
       blip(880, 0.15, 'sine', 0.06);
+    }
+    if (w % 10 === 0) { // miniboss wave: single heavy hitter
+      await spawnEnemy('boss', 0, -6.9);
+      if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
+      blip(196, 0.4, 'sawtooth', 0.07);
+      updHud();
+      return;
     }
     const count = 1 + Math.min(3, Math.floor((w - 1) / 4));
     const xs = [-2.3, -0.8, 0.8, 2.3].sort(() => Math.random() - 0.5).slice(0, count);
@@ -335,7 +343,7 @@ export async function startBattle(ctx) {
   // ---- HUD ----
   function updHud() {
     document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave);
-    document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 🔥x${S.combo}` : '');
+    document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 연속x${S.combo}` : '');
     document.getElementById('bt-xp').style.width = Math.min(100, S.xp / xpNeed() * 100) + '%';
     document.getElementById('bt-hearts').textContent = '♥'.repeat(Math.max(0, S.heroHP)) || '💀';
     document.getElementById('bt-balls').innerHTML = S.inventory.map(b =>
@@ -458,7 +466,7 @@ export async function startBattle(ctx) {
       if (e.z >= DANGER_Z) {
         S.enemies = S.enemies.filter(x => x !== e);
         scene.remove(e.obj); labels.remove(e.label);
-        hurtHero(e.type === 'warrior' ? 2 : 1, e.x, DANGER_Z);
+        hurtHero(e.type === 'boss' ? 3 : e.type === 'warrior' ? 2 : 1, e.x, DANGER_Z);
         if (S.over) return;
       }
       // 영웅 접촉
@@ -508,9 +516,9 @@ export async function startBattle(ctx) {
     if (!ctx.norender || S.fcount % 30 === 0) {
       const placed = [];
       for (const e of [...S.enemies].sort((a, b2) => a.x - b2.x)) {
-        const p = proj(new THREE.Vector3(e.x, e.h + 0.3, e.z));
-        let px = p.x, py = p.y - 14;
-        while (placed.some(q => Math.abs(q.x - px) < 46 && Math.abs(q.y - py) < 18)) py += 18;
+        const p = proj(new THREE.Vector3(e.x, e.h + 0.55, e.z));
+        let px = p.x, py = p.y - 22;
+        while (placed.some(q => Math.abs(q.x - px) < 40 && Math.abs(q.y - py) < 16)) py += 16;
         placed.push({ x: px, y: py });
         labels.place(e.label, px, py);
       }
@@ -534,7 +542,7 @@ export async function startBattle(ctx) {
     raf(loop);
   }
 
-  if (ctx.probe) {
+  if (ctx.probe) { window.__S = S;
     await spawnEnemy('minion', 0, -3);
     S.aimDir = 0;
   } else { await spawnRow(); await spawnRow(); }
