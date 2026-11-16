@@ -106,20 +106,27 @@ export function blip(f = 440, d = 0.05, type = 'square', g = 0.035, priority = 0
 }
 
 export const BALL_TYPES = {
-  iron: { name: '철구',  color: 0xb8c4d4, css: '#b8c4d4', desc: '기본 공. 튕기며 적을 친다.' },
-  fire: { name: '화염구', color: 0xff5a1a, css: '#ff6a2a', desc: '적중 시 주변 적에게 폭발 피해.' },
-  ice:  { name: '빙결구', color: 0x6ec8ff, css: '#6ec8ff', desc: '적중한 적의 다음 전진을 얼린다.' },
+  iron: { name: '철구',  color: 0xb8c4d4, css: '#b8c4d4', desc: '동결된 적을 치면 쇄빙 +2 (강철구 +4).' },
+  fire: { name: '화염구', color: 0xff5a1a, css: '#ff6a2a', desc: '주변 폭발. 중독된 적은 독을 소모해 점화.' },
+  ice:  { name: '빙결구', color: 0x6ec8ff, css: '#6ec8ff', desc: '적을 동결. 철구로 치면 동결을 깨고 추가 피해.' },
   bolt: { name: '번개구', color: 0xffe14d, css: '#ffe14d', desc: '적중 시 가장 가까운 다른 적에게 연쇄.' },
-  poison: { name: '독구', color: 0x7ddc3f, css: '#7ddc3f', desc: '적중한 적을 중독시켜 지속 피해.' },
+  poison: { name: '독구', color: 0x7ddc3f, css: '#7ddc3f', desc: '지속 피해. 화염으로 치면 남은 독 1초분 즉시 피해.' },
 };
 export const EVOLVED = {
   fire: { name: '작열구', desc: '더 넓은 폭발과 강한 피해.' },
   ice:  { name: '혹한구', desc: '더 오래 얼리는 강력한 냉기.' },
   bolt: { name: '뇌전구', desc: '여러 적에게 튀는 연쇄 번개.' },
-  iron: { name: '강철구', desc: '묵직한 일격의 강화 철구.' },
+  iron: { name: '강철구', desc: '동결을 깨면 추가 피해 4. 동결 소모.' },
   poison: { name: '맹독구', desc: '더 강하고 오래 퍼지는 맹독.' },
 };
 export function ballName(b) { return (b.evolved ? EVOLVED[b.type].name : BALL_TYPES[b.type].name) + ' Lv.' + b.lv; }
 export function ballDmg(b) { const base = b.evolved ? 2 + b.lv * 2 : b.lv; return base; }
 
 export function isLite() { return new URLSearchParams(location.search).has('lite'); }
+
+// Reactions consume the prior status once; they are not multiplied by direct-hit upgrades.
+export function ballReaction(def, enemy) {
+  if (def.type === 'iron' && enemy.frozen > 0) return { kind: 'shatter', damage: def.evolved ? 4 : 2 };
+  if (def.type === 'fire' && enemy.poison?.t > 0) return { kind: 'ignite', damage: Math.max(1, Math.ceil(enemy.poison.dps * Math.min(1, enemy.poison.t))) };
+  return null;
+}
