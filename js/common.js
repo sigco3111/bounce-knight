@@ -130,3 +130,16 @@ export function ballReaction(def, enemy) {
   if (def.type === 'fire' && enemy.poison?.t > 0) return { kind: 'ignite', damage: Math.max(1, Math.ceil(enemy.poison.dps * Math.min(1, enemy.poison.t))) };
   return null;
 }
+
+// Preview only: choosing a goal never spends gold or changes the save.
+export function nextExpeditionPlan(save, extraGold = 0) {
+  const target = (Math.floor(save.bestWave / 5) + 1) * 5;
+  const options = [
+    { key: 'castleLv', name: '성', benefit: `HP ${save.castleLv + 2} → ${save.castleLv + 3}` },
+    { key: 'forgeLv', name: '대장간', benefit: `직격 +${(save.forgeLv - 1) * 20}% → +${save.forgeLv * 20}%` },
+    { key: 'tavernLv', name: '주점', benefit: `출격 공 ${save.tavernLv + 2} → ${save.tavernLv + 3}개` },
+  ];
+  const pick = options.reduce((a, b) => save[a.key] <= save[b.key] ? a : b);
+  const cost = save[pick.key] * 60, gold = save.gold + extraGold;
+  return { ...pick, target, cost, gold, shortage: Math.max(0, cost - gold) };
+}
