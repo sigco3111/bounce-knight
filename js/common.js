@@ -26,7 +26,7 @@ export async function loadModel(url, opt = {}) {
     mx.update(opt.poseT != null ? opt.poseT : 0.5);
     if (opt.animate) mixer = mx;
   }
-  return { obj: o, h: size.y * s, w: size.x * s, mixer };
+  return { obj: o, h: size.y * s, w: size.x * s, mixer, animations: g.animations || [] };
 }
 
 export function projector(camera, w, h) {
