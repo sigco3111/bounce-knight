@@ -171,17 +171,34 @@ export async function startBattle(ctx) {
   function updEnemyLabel(e) {
     e.label.el.innerHTML = `<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
+  function milestone(w) { // wave-clear reward, real gold + heal, not just UI
+    const bonus = 10 + w;
+    S.gold += bonus;
+    const healed = S.heroHP < ctx.heroMaxHP();
+    if (healed) S.heroHP++;
+    if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
+    blip(880, 0.15, 'sine', 0.06);
+    updHud();
+  }
+  function typeHitBurst(def, e) { // per-type hit fx so fire/ice/bolt/iron read differently
+    const y = Math.max(0.4, (e.h || 1) * 0.6), ev = !!def.evolved;
+    if (def.type === 'fire') { // 폭발형: 크고 높이 솟는 화염 파편 + 잔불
+      burst(e.x, e.z, 0xff7a1f, ev ? 16 : 11, ev ? 5.2 : 4.0, y, { vy0: 3, vyR: 3.5, ttl0: 0.6, ttlR: 0.3, sc: ev ? 1.5 : 1.15 });
+      burst(e.x, e.z, 0xff3d00, ev ? 8 : 5, ev ? 3.2 : 2.4, y, { vy0: 1.6, vyR: 2, ttl0: 0.8, ttlR: 0.3, sc: 0.75 });
+    } else if (def.type === 'ice') { // 낮게 퍼지는 냉기 파편 + 서리 안개
+      burst(e.x, e.z, 0x9fd8ff, ev ? 13 : 9, ev ? 3.2 : 2.4, y, { vy0: 0.5, vyR: 0.9, ttl0: 0.75, ttlR: 0.3, sc: ev ? 1.3 : 1 });
+      burst(e.x, e.z, 0xffffff, 4, 1.4, y, { vy0: 0.7, vyR: 0.5, ttl0: 0.4, ttlR: 0.15, sc: 0.65 });
+    } else if (def.type === 'bolt') { // 빠르고 짧은 전기 스냅 + 백색 섬광
+      burst(e.x, e.z, 0xffe14d, ev ? 12 : 8, ev ? 7 : 5.5, y, { vy0: 1.2, vyR: 1.6, ttl0: 0.28, ttlR: 0.12, sc: ev ? 1.2 : 0.9 });
+      burst(e.x, e.z, 0xffffff, 3, 3.2, y, { vy0: 0.8, vyR: 0.6, ttl0: 0.18, ttlR: 0.08, sc: 0.55 });
+    } else { // iron: 묵직한 금속 파편
+      burst(e.x, e.z, 0xdde7f2, ev ? 14 : 9, ev ? 4.8 : 3.6, y, { vy0: 2, vyR: 2.5, ttl0: 0.45, ttlR: 0.15, sc: ev ? 1.4 : 1 });
+    }
+  }
   async function spawnRow(advance) {
     if (advance) S.wave++;
     const w = S.wave;
-    if (advance && w % 5 === 0) { // wave milestone: real reward, not just UI
-      const bonus = 10 + w;
-      S.gold += bonus;
-      const healed = S.heroHP < ctx.heroMaxHP();
-      if (healed) S.heroHP++;
-      if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.32, `웨이브 ${w} 돌파! +${bonus}🪙` + (healed ? ' · HP +1' : ''), 'banner');
-      blip(880, 0.15, 'sine', 0.06);
-    }
+    if (advance && w % 5 === 0 && w % 10 !== 0) milestone(w); // boss waves pay on boss kill instead
     if (advance && w % 10 === 0) { // miniboss wave: single heavy hitter, gates the wave counter until killed
       await spawnEnemy('boss', 0, -6.9);
       if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
@@ -214,14 +231,15 @@ export async function startBattle(ctx) {
 
   // ---- fx: particle bursts ----
   const partGeo = new THREE.TetrahedronGeometry(0.12);
-  function burst(x, z, color, n = 8, spd = 3, y = 0.35) {
+  function burst(x, z, color, n = 8, spd = 3, y = 0.35, o = {}) {
     if (ctx.norender) return;
+    const vy0 = o.vy0 ?? 2, vyR = o.vyR ?? 2.5, ttl0 = o.ttl0 ?? 0.55, ttlR = o.ttlR ?? 0.2, sc = o.sc ?? 1;
     for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color, transparent: true }));
       const a = Math.random() * Math.PI * 2, s = spd * (0.5 + Math.random() * 0.8);
       m.position.set(x, y, z);
       scene.add(m);
-      S.parts.push({ mesh: m, vx: Math.cos(a) * s, vy: 2 + Math.random() * 2.5, vz: Math.sin(a) * s, ttl: 0.55 + Math.random() * 0.2, t: 0 });
+      S.parts.push({ mesh: m, vx: Math.cos(a) * s, vy: vy0 + Math.random() * vyR, vz: Math.sin(a) * s, ttl: ttl0 + Math.random() * ttlR, t: 0, sc });
     }
   }
 
@@ -255,7 +273,7 @@ export async function startBattle(ctx) {
     if (src.def.evolved) { S.evolvedHits++; S.lastEvolvedDmg = dmg; }
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + dmg); }
     blip(220 + Math.random() * 60, 0.04, 'square', 0.025);
-    burst(e.x, e.z, BALL_TYPES[src.def.type].color, src.def.evolved ? 14 : 9, src.def.evolved ? 4.6 : 3.4, Math.max(0.4, (e.h || 1) * 0.6));
+    typeHitBurst(src.def, e);
     if (src.def.type === 'fire') {
       const rad = src.def.evolved ? 1.4 : 0.95, sd = Math.max(1, Math.ceil(dmg / 2));
       for (const o of S.enemies) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < rad) { o.hp -= sd; updEnemyLabel(o); }
@@ -264,7 +282,12 @@ export async function startBattle(ctx) {
     } else if (src.def.type === 'bolt') {
       const nChain = src.def.evolved ? 3 : 1;
       const others = S.enemies.filter(o => o !== e).sort((a, b) => Math.hypot(a.x - e.x, a.z - e.z) - Math.hypot(b.x - e.x, b.z - e.z));
-      for (const o of others.slice(0, nChain)) if (Math.hypot(o.x - e.x, o.z - e.z) < 2.2) { o.hp -= 1; updEnemyLabel(o); }
+      for (const o of others.slice(0, nChain)) if (Math.hypot(o.x - e.x, o.z - e.z) < 2.2) {
+        o.hp -= 1;
+        o.flash = Math.max(o.flash, 0.12); // chain victims flash so the jump reads
+        burst(o.x, o.z, 0xffe14d, 5, 3.2, Math.max(0.4, (o.h || 1) * 0.6), { vy0: 1.2, vyR: 1.2, ttl0: 0.26, ttlR: 0.1, sc: 0.7 });
+        updEnemyLabel(o);
+      }
     }
     updEnemyLabel(e);
     for (const o of [...S.enemies]) if (o.hp <= 0) killEnemy(o);
@@ -273,8 +296,9 @@ export async function startBattle(ctx) {
     S.enemies = S.enemies.filter(x => x !== e);
     scene.remove(e.obj); labels.remove(e.label);
     S.kills++;
-    burst(e.x, e.z, 0xffd76a, 12, 4.5, 0.55);
-    burst(e.x, e.z, 0xfff6dd, 5, 2.5, 0.9);
+    const bsc = e.type === 'boss' ? 1.7 : 1;
+    burst(e.x, e.z, 0xffd76a, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
+    burst(e.x, e.z, 0xfff6dd, e.type === 'boss' ? 8 : 5, 2.5, 0.9, { sc: bsc });
     S.shake = Math.max(S.shake || 0, 0.09);
     S.combo = (S.now - S.comboT <= 4) ? S.combo + 1 : 1; // kill streak within 4s
     S.comboT = S.now;
@@ -283,6 +307,7 @@ export async function startBattle(ctx) {
     dropGem(e.x + (Math.random() - 0.5) * 0.3, e.z);
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.7, e.z)); popup(labelsC, p.x, p.y, '+' + g, 'gold'); }
     blip(660, 0.09, 'triangle', 0.04);
+    if (e.type === 'boss') milestone(S.wave); // boss gate: wave-clear reward lands when the boss actually falls
     updHud();
   }
 
@@ -487,7 +512,7 @@ export async function startBattle(ctx) {
       p.mesh.rotation.x += dt * 6; p.mesh.rotation.y += dt * 7;
       const k = Math.max(0, 1 - p.t / p.ttl);
       p.mesh.material.opacity = k;
-      p.mesh.scale.setScalar(Math.max(0.05, k));
+      p.mesh.scale.setScalar(Math.max(0.05, k * (p.sc || 1)));
       if (p.t >= p.ttl) { scene.remove(p.mesh); p.mesh.material.dispose(); S.parts = S.parts.filter(q => q !== p); }
     }
     // balls
