@@ -107,9 +107,26 @@ export async function startBattle(ctx) {
   };
 
   // ---- static set ----
-  const TW = 2.2;
+  const TW = 2.2, floorTiles = [];
   for (let i = -2; i <= 2; i++) for (let j = -4; j <= 2; j++)
-    await loadModel('./models/d_floor_tile_large.glb', { w: TW, x: i * TW, z: j * TW, clone: false }).then(m => { doubleSide(m.obj); scene.add(m.obj); });
+    floorTiles.push((await loadModel('./models/d_floor_tile_large.glb', { w: TW, x: i * TW, z: j * TW })).obj);
+  // Identical static tiles share draws. Keep every source mesh transform and material.
+  const floorGroups = new Map();
+  for (const tile of floorTiles) {
+    doubleSide(tile); tile.updateMatrixWorld(true);
+    tile.traverse(mesh => {
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const key = mesh.geometry.uuid + ':' + materials.map(m => m.uuid).join(',');
+      if (!floorGroups.has(key)) floorGroups.set(key, { geometry: mesh.geometry, material: mesh.material, transforms: [] });
+      floorGroups.get(key).transforms.push(mesh.matrixWorld.clone());
+    });
+  }
+  for (const group of floorGroups.values()) {
+    const batch = new THREE.InstancedMesh(group.geometry, group.material, group.transforms.length);
+    group.transforms.forEach((matrix, i) => batch.setMatrixAt(i, matrix));
+    batch.computeBoundingSphere(); scene.add(batch);
+  }
   for (let z = -8.9; z <= 4; z += 2.59) {
     const lw = (await loadModel('./models/d_wall.glb', { h: 2.7, x: -3.45, z, ry: Math.PI / 2 })).obj;
     const rw = (await loadModel('./models/d_wall.glb', { h: 2.7, x: 3.45, z, ry: -Math.PI / 2 })).obj;
@@ -1068,4 +1085,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                             }
+                                            }
