@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from '../lib/loaders/GLTFLoader.js';
-import * as SkeletonUtils from '../lib/utils/SkeletonUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
