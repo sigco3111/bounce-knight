@@ -118,6 +118,10 @@
 
   #btn-knight { flex-shrink:0;min-height:32px;padding:5px 7px;border:1px solid #66789c;border-radius:7px;background:#273349;color:#eee4cd;font:700 10px sans-serif;cursor:pointer; }
   #screen-base .res-bar { gap:8px;padding:0 10px; }
+  #ov-relic { padding:18px;box-sizing:border-box;overflow:auto;gap:10px; }
+  #ov-relic .cards { width:100%;max-width:700px; }
+  #ov-relic .card-pick { padding:10px; }
+  @media (min-aspect-ratio:6/5) { #ov-relic { justify-content:flex-start;padding:12px; } #ov-relic .cards { display:grid;grid-template-columns:repeat(3,minmax(0,1fr)); } }
   #ov-knights { z-index:20;padding:20px;box-sizing:border-box;overflow-y:auto;gap:12px;background:#080e1cf5; }
   #ov-knights .cards { width:100%;max-width:440px; }
   #ov-knights button:disabled { opacity:.45;cursor:default; }
@@ -128,8 +132,16 @@
   #region-options button { flex:1;min-width:0;font:700 10px sans-serif;padding:8px 2px;color:#cbd7ed;background:#273349;border:1px solid #495870;border-radius:7px;cursor:pointer; }
   #region-options button[aria-pressed=true] { background:#723e2b;border-color:#f0b675;color:#ffedca; }
   #region-options button:disabled { opacity:.48;cursor:default; }
+  #ov-prep { z-index:21;background:#080e1cf7;justify-content:flex-start;overflow:auto;padding:18px;box-sizing:border-box; }
+  .prep-body { width:100%;max-width:720px;text-align:center; }
+  #ov-prep .cards { width:100%; } #ov-prep .card-pick { padding:10px; }
+  #ov-prep h3 { font-size:14px;color:#ebcc97;margin:14px 0 7px; }
+  #ov-prep button[aria-pressed=true] { outline:1px solid #e7ab59; }
+  #codex-list { white-space:pre-line;text-align:left;font-size:11px;line-height:1.8;color:#afbfda;margin:8px 0 18px; }
+  @media (min-width:600px) { #route-cards,#contract-cards { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  #btn-route { margin-top:5px;min-height:28px;width:100%;background:#263348;color:#e4d9b5;border:1px solid #526383;border-radius:7px;font:700 11px sans-serif;cursor:pointer; }
   #region-detail { margin-top:5px;font-size:10px;line-height:14px;color:#acbddb; }
-  @media (min-aspect-ratio:6/5) { #region-select { left:56%;top:60px; } #screen-base .base-card { top:145px; } }
+  @media (min-aspect-ratio:6/5) { #region-select { left:56%;top:60px; } #screen-base .base-card { top:178px; } }
   /* ---- base screen ---- */
   .res-bar { position:absolute; top:12px; left:12px; right:12px; height:46px; background:rgba(16,21,36,.95);
     border-radius:14px; box-shadow:0 3px 0 rgba(0,0,0,.5); display:flex; align-items:center; padding:0 14px; gap:14px; z-index:6; }
@@ -182,9 +194,18 @@
     <div class="cards" id="knight-cards"></div>
     <button id="btn-knight-close" class="btn sub" type="button">닫기</button>
   </div>
+  <div id="ov-prep" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="prep-title">
+    <div class="prep-body">
+      <div class="ttl" id="prep-title">원정 준비</div><div class="dsc">원정 조건 하나와 계약 하나. 비용은 없습니다.</div>
+      <h3>원정 조건</h3><div id="route-cards" class="cards"></div>
+      <h3>도전 계약</h3><div id="contract-cards" class="cards"></div><div class="dsc">달성 보상은 원정 종료 시 계산합니다. 미달성은 보상 없음.</div>
+      <h3 id="codex-title">유물 도감</h3><div id="codex-list"></div>
+      <button class="btn sub" id="btn-prep-close" type="button">준비 완료 · 닫기</button>
+    </div>
+  </div>
   <div class="title-base">전진 기지</div>
   <div id="base-labels"></div>
-  <div id="region-select"><div id="region-options" role="group" aria-label="원정 지역"></div><div id="region-detail"></div></div>
+  <div id="region-select"><div id="region-options" role="group" aria-label="원정 지역"></div><div id="region-detail"></div><button id="btn-route" type="button"></button></div>
   <div class="base-card">
     <div class="t1" id="bld-name">성 Lv.1</div>
     <div class="t2" id="bld-desc">영웅 최대 HP +1</div>
@@ -214,7 +235,11 @@
       <div class="xp" role="progressbar" aria-label="경험치" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0"><i id="bt-xp"></i><span id="bt-xp-text"></span></div>
       <div class="hearts" id="bt-hearts">♥♥♥</div>
     </div>
-    <div class="ball-row" id="bt-balls"></div>
+    <div class="ball-row" id="bt-balls"></div><div id="bt-relics" style="color:#d5c28f;font-size:10px;margin-top:4px;line-height:14px"></div>
+  </div>
+  <div class="overlay hidden" id="ov-relic" role="dialog" aria-modal="true" aria-labelledby="relic-title">
+    <div class="ttl" id="relic-title">유물 발견</div><div class="dsc" id="relic-desc" style="text-align:center"></div>
+    <div id="relic-cards" class="cards"></div><button class="btn sub" id="btn-relic-skip" type="button">이번 발견은 지나가기</button>
   </div>
   <div class="overlay hidden" id="ov-event" role="dialog" aria-modal="true" aria-labelledby="event-title">
     <div class="ttl" id="event-title"></div>
@@ -229,7 +254,7 @@
   </div>
   <div class="overlay hidden" id="ov-over" role="dialog" aria-modal="true" aria-labelledby="over-ttl" aria-describedby="over-dsc over-plan">
     <div class="ttl" id="over-ttl">원정 종료</div>
-    <div class="dsc" id="over-dsc"></div>
+    <div class="dsc" id="over-dsc" style="white-space:pre-line;max-width:290px;text-align:center;line-height:1.7;font-size:12px"></div>
     <div id="over-plan" style="white-space:pre-line;line-height:1.8;font-size:12px;color:#cad3e7;background:#1b2334;padding:12px;border-radius:12px;max-width:310px;box-sizing:border-box;text-align:center"></div>
     <button class="btn" id="btn-tobase">기지로 돌아가기</button>
   </div>
