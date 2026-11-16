@@ -275,3 +275,28 @@ assert.equal(gemReach(-7.2).gemsGot, 1);
 assert.equal(gemReach(-7.2).xp, 1);
 assert.equal(gemReach(0, 3.4).xp, 0); // ordinary distant drops are not globally auto-collected
 console.log('PASS: unreachable front-row drop enters reachable lane and awards exactly one XP; ordinary pickup range unchanged.');
+
+// Combinations consume a prior status, rather than becoming a permanent damage buff.
+const reactionBox = vm.createContext({});
+vm.runInContext(common.slice(common.indexOf('export function ballReaction')).replace('export ', '') + '\nglobalThis.react=ballReaction;', reactionBox);
+assert.equal(reactionBox.react(ball('iron'), { frozen: 1 }).damage, 2);
+assert.equal(reactionBox.react(ball('iron', 1, true), { frozen: 1 }).damage, 4);
+assert.equal(reactionBox.react(ball('iron'), { frozen: 0 }), null);
+assert.equal(reactionBox.react(ball('fire'), { poison: { dps: 3, t: 4 } }).damage, 3);
+assert.equal(reactionBox.react(ball('fire'), { poison: { dps: 3, t: 0.2 } }).damage, 1);
+assert.equal(reactionBox.react(ball('bolt'), { frozen: 1, poison: { dps: 3, t: 4 } }), null);
+const damageLogic = between(battle, '  function damageEnemy(', '  function updBossBar(');
+function reactHit(type, status) {
+  const e = { hp: 100, mats: [], x: 0, z: 0, h: 1, ...status };
+  const S = { enemies: [e], reactions: 0, evolvedHits: 0 };
+  const box = vm.createContext({ S, Math, ctx: { norender: true }, ballReaction: reactionBox.react, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
+  vm.runInContext(damageLogic + '\nglobalThis.hit=damageEnemy;', box);
+  const src = { def: ball(type) };
+  box.hit(e, 1, src); const first = e.hp; box.hit(e, 1, src);
+  return { e, S, first };
+}
+let rh = reactHit('iron', { frozen: 1, iceBox: {} });
+assert.equal(rh.first, 97); assert.equal(rh.e.hp, 96); assert.equal(rh.e.frozen, 0); assert.equal(rh.e.iceBox, null); assert.equal(rh.S.reactions, 1);
+rh = reactHit('fire', { poison: { dps: 3, t: 4 } });
+assert.equal(rh.first, 96); assert.equal(rh.e.hp, 95); assert.equal(rh.e.poison, null); assert.equal(rh.S.reactions, 1);
+console.log('PASS: ice+iron shatter and poison+fire ignition formulas; actual hit handler consumes status and triggers once.');
