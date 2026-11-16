@@ -970,11 +970,13 @@ export async function startBattle(ctx) {
       const placed = [];
       const bossBar = document.getElementById('bt-bossbar');
       const labelTop = (bossBar.classList.contains('hidden') ? topHud.getBoundingClientRect().bottom : bossBar.getBoundingClientRect().bottom) + 4;
-      for (const e of [...S.enemies].sort((a, b2) => a.x - b2.x)) {
-        if (e.type === 'boss') continue;
+      // Batch size/viewport reads and projection before any position writes.
+      const enemyLabels = [...S.enemies].filter(e => e.type !== 'boss').sort((a, b2) => a.x - b2.x).map(e => {
         const p = proj(new THREE.Vector3(e.x, e.h + 0.55, e.z));
-        let px = Math.max(20, Math.min(W() - 20, p.x)), py = Math.max(labelTop, p.y - 22);
-        const lw = e.label.el.offsetWidth || 34, lh = e.label.el.offsetHeight || 21;
+        return { e, lw: e.label.el.offsetWidth || 34, lh: e.label.el.offsetHeight || 21,
+          px: Math.max(20, Math.min(W() - 20, p.x)), py: Math.max(labelTop, p.y - 22) };
+      });
+      for (let { e, lw, lh, px, py } of enemyLabels) {
         while (placed.some(q => Math.abs(q.x - px) < (q.w + lw) / 2 + 3 && py < q.y + q.h + 3 && py + lh + 3 > q.y)) py += lh + 3;
         placed.push({ x: px, y: py, w: lw, h: lh });
         labels.place(e.label, px, py);
@@ -1029,4 +1031,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-    }
+}
