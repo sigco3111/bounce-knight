@@ -202,6 +202,28 @@ export async function startBattle(ctx) {
     scene.add(m);
     S.rings.push({ mesh: m, t: 0, ttl, maxR });
   }
+  function bounceFx(b) { // 벽 튕김: 짧은 타입색 스파크 + 작은 고리 — 적 타격(본체 플래시+피해 수치+큰 고리)과 구분
+    const bc = BALL_TYPES[b.def.type].color;
+    burst(b.x, b.z, bc, 5, 2.2, 0.3, { ttl0: 0.3, ttlR: 0.12, sc: 0.8 });
+    ring(b.x, b.z, bc, 0.55, 0.26);
+    blip(470 + Math.random() * 70, 0.03, 'square', 0.011);
+  }
+  function fusionFx(type, x, z) { // 융합: 타입색 이중 고리 + 좌우에서 빨려드는 수렴 섬광 + 전체 플래시
+    if (ctx.norender) return;
+    const col = BALL_TYPES[type].color;
+    for (const sgn of [-1, 1]) for (let i = 0; i < 6; i++) { // 두 공이 하나로 모이는 수렴 파편
+      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.position.set(x + sgn * (1.5 + i * 0.18), 0.4, z - (i % 3) * 0.35);
+      scene.add(m);
+      S.parts.push({ mesh: m, vx: -sgn * 4.5, vy: 0.8, vz: 0.4 * ((i % 3) - 1), ttl: 0.42, t: 0, sc: 1.1 });
+    }
+    burst(x, z, col, 14, 4.5, 0.5, { vy0: 2.2, vyR: 1.5, ttl0: 0.5, ttlR: 0.2, sc: 1.2 });
+    burst(x, z, 0xffe27a, 18, 5, 0.4);
+    burst(x, z, 0xffffff, 8, 2.8, 0.8, { add: true });
+    ring(x, z, col, 1.7, 0.55);
+    setTimeout(() => ring(x, z, 0xffffff, 1.15, 0.45), 160); // 잔상 고리
+    fuseFlash.classList.remove('on'); void fuseFlash.offsetWidth; fuseFlash.classList.add('on');
+  }
   function typeHitBurst(def, e) { // per-type hit fx so fire/ice/bolt/iron read differently
     const y = Math.max(0.4, (e.h || 1) * 0.6), ev = !!def.evolved;
     if (def.type === 'fire') ring(e.x, e.z, 0xff7a1f, ev ? 1.5 : 1.1, 0.4);
@@ -452,9 +474,7 @@ export async function startBattle(ctx) {
       const nb = { type: c.pair[0].type, lv: c.pair[0].lv, evolved: true }; // fusion keeps the pair's level: evolving always feels like an upgrade
       S.inventory.push(nb);
       if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.3, `융합! ${ballName(nb)} 탄생`, 'banner');
-      burst(S.heroX, S.heroZ - 0.8, 0xffe27a, 22, 5, 0.4);
-      burst(S.heroX, S.heroZ - 0.8, 0xffffff, 8, 2.8, 0.8);
-      fuseFlash.classList.remove('on'); void fuseFlash.offsetWidth; fuseFlash.classList.add('on');
+      fusionFx(c.pair[0].type, S.heroX, S.heroZ - 0.8);
       blip(660, 0.1, 'triangle', 0.05);
       setTimeout(() => blip(990, 0.16, 'triangle', 0.05), 100);
     }
@@ -592,10 +612,9 @@ export async function startBattle(ctx) {
     // balls
     for (const b of [...S.balls]) {
       b.x += b.vx * dt; b.z += b.vz * dt;
-      const bc = BALL_TYPES[b.def.type].color; // 튕김 스파크도 공 타입 색을 따라가게 해 소속이 읽히게
-      if (b.x < -AX + BALL_R) { b.x = -AX + BALL_R; b.vx = Math.abs(b.vx); burst(b.x, b.z, bc, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
-      if (b.x > AX - BALL_R) { b.x = AX - BALL_R; b.vx = -Math.abs(b.vx); burst(b.x, b.z, bc, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
-      if (b.z < BACK + BALL_R) { b.z = BACK + BALL_R; b.vz = Math.abs(b.vz); burst(b.x, b.z, bc, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      if (b.x < -AX + BALL_R) { b.x = -AX + BALL_R; b.vx = Math.abs(b.vx); bounceFx(b); }
+      if (b.x > AX - BALL_R) { b.x = AX - BALL_R; b.vx = -Math.abs(b.vx); bounceFx(b); }
+      if (b.z < BACK + BALL_R) { b.z = BACK + BALL_R; b.vz = Math.abs(b.vz); bounceFx(b); }
       for (const e of S.enemies) {
         const dx = b.x - e.x, dz = b.z - e.z, d = Math.hypot(dx, dz), rs = BALL_R + ENEMY_R;
         if (d < rs) {
@@ -769,6 +788,7 @@ export async function startBattle(ctx) {
   }
 
   if (ctx.probe) { window.__S = S;
+    window.__fx = { fusion: t => fusionFx(t || 'fire', S.heroX, S.heroZ - 0.8), bounce: () => { const b = S.balls[0]; if (b) bounceFx(b); } };
     await spawnEnemy('minion', 0, -3);
     S.aimDir = 0;
   } else { await spawnRow(true); await spawnRow(true); }
@@ -799,4 +819,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+                                                                     }
