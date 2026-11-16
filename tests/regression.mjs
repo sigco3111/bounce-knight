@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice } from '../js/content.js';
+import { REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice, KNIGHTS, knightOpen, selectedKnight, validKnight } from '../js/content.js';
 
 const root = new URL('../', import.meta.url);
 const battle = fs.readFileSync(new URL('js/battle.js', root), 'utf8');
@@ -74,7 +74,7 @@ console.log(`PASS: ${cases} seeded card selections; distinct new balls, growth p
 
 // Save validation tests use the exact predicate; no browser storage is read or written.
 const main = fs.readFileSync(new URL('js/main.js', root), 'utf8');
-const saveBox = vm.createContext({ validRegionProgress });
+const saveBox = vm.createContext({ validRegionProgress, validKnight });
 vm.runInContext(between(main, 'const defaults =', 'const rawSave =') + '\nglobalThis.qa={defaults,validSave};', saveBox);
 const valid = saveBox.qa.defaults();
 assert.ok(saveBox.qa.validSave(valid));
@@ -139,7 +139,7 @@ function storageFixture(initial = {}, failWrites = false, failReads = false, env
     setItem(key, value) { if (failWrites) throw new Error('quota'); writes.push([key, value]); data.set(key, value); },
     removeItem(key) { removed.push(key); data.delete(key); }
   };
-  const box = vm.createContext({ validRegionProgress, localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
+  const box = vm.createContext({ validRegionProgress, validKnight, localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
   vm.runInContext(between(main, 'const SAVE_KEY', "window.addEventListener('error'") + '\nglobalThis.qa={offerLegacyImport,persist,get save(){return save},get sessionOnly(){return sessionOnly}};', box);
   return { qa: box.qa, data, writes, removed, elements, reloads: () => reloads, blockWrites() { failWrites = true; } };
 }
@@ -291,7 +291,7 @@ const damageLogic = between(battle, '  function damageEnemy(', '  function updBo
 function reactHit(type, status) {
   const e = { hp: 100, mats: [], x: 0, z: 0, h: 1, ...status };
   const S = { enemies: [e], reactions: 0, evolvedHits: 0 };
-  const box = vm.createContext({ S, Math, ctx: { norender: true }, ballReaction: reactionBox.react, ballHas: reactionBox.ballHasRule, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
+  const box = vm.createContext({ S, Math, statusScale:1, ctx: { norender: true }, ballReaction: reactionBox.react, ballHas: reactionBox.ballHasRule, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
   vm.runInContext(damageLogic + '\nglobalThis.hit=damageEnemy;', box);
   const src = { def: ball(type) };
   box.hit(e, 1, src); const first = e.hp; box.hit(e, 1, src);
@@ -392,7 +392,7 @@ console.log('PASS: new ball evolution, four unordered cross recipes, lower-level
 {
   const enemy = (x,z) => ({hp:100,mats:[],x,z,h:1,obj:{position:{y:0,set(){}}}});
   const e=enemy(0,-2), o=enemy(1,-2), S={enemies:[e,o],reactions:0,evolvedHits:0};
-  const box=vm.createContext({S,Math,BACK:-8,ctx:{norender:true},ballHas:rules.rules.ballHas,ballReaction:reactionBox.react,ballDmg:rules.rules.ballDmg,BALL_TYPES:rules.rules.BALL_TYPES,scene:{remove(){}},blip(){},ring(){},burst(){},typeHitBurst(){},updHud(){},updEnemyLabel(){},updBossBar(){},killEnemy(){}});
+  const box=vm.createContext({S,Math,BACK:-8,statusScale:1,ctx:{norender:true},ballHas:rules.rules.ballHas,ballReaction:reactionBox.react,ballDmg:rules.rules.ballDmg,BALL_TYPES:rules.rules.BALL_TYPES,scene:{remove(){}},blip(){},ring(){},burst(){},typeHitBurst(){},updHud(){},updEnemyLabel(){},updBossBar(){},killEnemy(){}});
   vm.runInContext(damageLogic+'\nglobalThis.hit=damageEnemy;',box);
   box.hit(e,1,{def:ball('wind')});assert.equal(e.z,-2.45);
   e.z=-2;box.hit(e,1,{def:ball('gravity')});assert.equal(o.x,0.6);
@@ -400,3 +400,22 @@ console.log('PASS: new ball evolution, four unordered cross recipes, lower-level
   box.hit(e,4,{def:{type:'venomgale',lv:1,hybrid:true}});assert.ok(e.poison.t>0);assert.ok(e.z<-2);
 }
 console.log('PASS: actual hit handler moves wind victims, pulls gravity neighbors, and combines frost/gravity and poison/wind.');
+
+assert.equal(KNIGHTS.length,3);
+assert.equal(selectedKnight({}).id,'guardian');
+assert.equal(selectedKnight({selectedKnight:'ranger'}).id,'guardian');
+assert.equal(selectedKnight({selectedKnight:'ranger',clearedRegions:['dungeon']}).id,'ranger');
+assert.ok(knightOpen({clearedRegions:['ruins']},KNIGHTS[2]));
+for (const bad of [null,1,{},'unknown']) assert.equal(validKnight(bad),false);
+assert.ok(saveBox.qa.validSave({...valid,selectedKnight:'alchemist'})); // known ID may be saved; selection still requires earned unlock
+assert.ok(!saveBox.qa.validSave({...valid,selectedKnight:'unknown'}));
+{
+  const S={heroHP:3,shake:0,shieldSpent:false};
+  const knight={id:'guardian'}, hitFlash={classList:{add(){},remove(){}},offsetWidth:0};
+  const box=vm.createContext({S,knight,Math,ctx:{norender:true},hitFlash,THREE:{Vector3:class{}},proj:()=>({x:0,y:0}),labelsC:{},popup(){},blip(){},setTimeout(){},updHud(){},gameOver(){}});
+  vm.runInContext(between(battle,'  function hurtHero(','  // ---- expedition choices:')+'\nglobalThis.hurt=hurtHero;',box);
+  box.hurt(1);assert.equal(S.heroHP,3);assert.ok(S.shieldSpent);box.hurt(1);assert.equal(S.heroHP,2);
+  S.heroHP=3;S.shieldSpent=false;box.hurt(3);assert.equal(S.heroHP,1);
+  knight.id='ranger';S.heroHP=3;S.shieldSpent=false;box.hurt(1);assert.equal(S.heroHP,2);
+}
+console.log('PASS: three knight selections, earned unlock fallback, optional save validation and one-use guardian damage reduction.');
