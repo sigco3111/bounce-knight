@@ -552,6 +552,7 @@ export async function startBattle(ctx) {
       cards.appendChild(d);
     }
     document.getElementById('bt-lv').textContent = 'Lv.' + S.level;
+    updHud(); // 새 레벨의 잔여 XP와 필요량을 선택 화면에도 즉시 반영
     document.getElementById('ov-levelup').classList.remove('hidden');
     cards.firstElementChild?.focus({ preventScroll: true });
     if (ctx.auto) setTimeout(() => {
@@ -963,4 +964,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                         }
+}
