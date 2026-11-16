@@ -76,7 +76,7 @@ export async function startBase(ctx) {
   scene.add((await loadModel(NAT + 'trees_A_small.gltf', { h: 1.1, x: 0, z: -HD, y: tileTop })).obj);
   scene.add((await loadModel(NAT + 'tree_single_A.gltf', { h: 1.2, x: -1.15 * CX, z: -HD * 0.95 })).obj);
   scene.add((await loadModel(NAT + 'rock_single_B.gltf', { h: 0.5, x: 1.15 * CX, z: -HD * 0.95 })).obj);
-  scene.add((await loadModel('./models/Knight.glb', { h: 1.05, x: 1.25, z: 2.3, ry: -0.5, poseT: 0.5 })).obj);
+  scene.add((await loadModel('./models/27-Knight.glb', { h: 1.05, x: 1.25, z: 2.3, ry: -0.5, poseT: 0.5 })).obj);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 18),
     new THREE.MeshStandardMaterial({ color: 0xff6a2a, emissive: 0xff4d1f, emissiveIntensity: 2.2, roughness: 0.35 }));
   ball.position.set(0.1, 0.3, 3.1); scene.add(ball);
