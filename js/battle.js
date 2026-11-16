@@ -111,6 +111,9 @@ export async function startBattle(ctx) {
   const fuseFlash = document.createElement('div');
   fuseFlash.id = 'fuse-flash';
   labelsC.parentElement.appendChild(fuseFlash);
+  const bossFlash = document.createElement('div');
+  bossFlash.id = 'boss-flash';
+  labelsC.parentElement.appendChild(bossFlash);
   const hero = (await loadModel('./models/27-Knight.glb', { s: 0.72, x: 0, z: HERO_Z, ry: Math.PI, poseT: 0.5 })).obj;
   scene.add(hero);
 
@@ -119,7 +122,7 @@ export async function startBattle(ctx) {
     phase: 'play', wave: 0, kills: 0, gold: 0, xp: 0, level: 1,
     heroHP: ctx.heroMaxHP(), heroX: 0, heroZ: HERO_Z,
     inventory: [0, 1, 2].map(() => ({ type: 'iron', lv: 1, evolved: false })),
-    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [], parts: [],
+    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [], parts: [], rings: [],
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
@@ -180,8 +183,20 @@ export async function startBattle(ctx) {
     blip(880, 0.15, 'sine', 0.06);
     updHud();
   }
+  function ring(x, z, color, maxR = 1.1, ttl = 0.4) { // local impact ring at the hit point
+    if (ctx.norender) return;
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.12, z);
+    scene.add(m);
+    S.rings.push({ mesh: m, t: 0, ttl, maxR });
+  }
   function typeHitBurst(def, e) { // per-type hit fx so fire/ice/bolt/iron read differently
     const y = Math.max(0.4, (e.h || 1) * 0.6), ev = !!def.evolved;
+    if (def.type === 'fire') ring(e.x, e.z, 0xff7a1f, ev ? 1.5 : 1.1, 0.4);
+    else if (def.type === 'ice') ring(e.x, e.z, 0x9fd8ff, ev ? 1.2 : 0.9, 0.5);
+    else if (def.type === 'bolt') ring(e.x, e.z, 0xffe14d, ev ? 1.0 : 0.75, 0.24);
+    else ring(e.x, e.z, 0xdde7f2, ev ? 0.9 : 0.7, 0.3);
     if (def.type === 'fire') { // 폭발형: 크고 높이 솟는 화염 파편 + 잔불
       burst(e.x, e.z, 0xff7a1f, ev ? 16 : 11, ev ? 5.2 : 4.0, y, { vy0: 3, vyR: 3.5, ttl0: 0.6, ttlR: 0.3, sc: ev ? 1.5 : 1.15 });
       burst(e.x, e.z, 0xff3d00, ev ? 8 : 5, ev ? 3.2 : 2.4, y, { vy0: 1.6, vyR: 2, ttl0: 0.8, ttlR: 0.3, sc: 0.75 });
@@ -201,7 +216,14 @@ export async function startBattle(ctx) {
     if (advance && w % 5 === 0 && w % 10 !== 0) milestone(w); // boss waves pay on boss kill instead
     if (advance && w % 10 === 0) { // miniboss wave: single heavy hitter, gates the wave counter until killed
       await spawnEnemy('boss', 0, -6.9);
-      if (!ctx.norender) popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
+      if (!ctx.norender) {
+        popup(labelsC, innerWidth / 2, innerHeight * 0.26, `미니보스 등장!`, 'banner');
+        bossFlash.classList.remove('on'); void bossFlash.offsetWidth; bossFlash.classList.add('on');
+        burst(0, -6.9, 0xff3b30, 24, 5.5, 0.7, { sc: 1.6, vy0: 3, vyR: 3 });
+        burst(0, -6.9, 0x3a1414, 10, 3, 0.5, { sc: 1.3, ttl0: 0.9, ttlR: 0.4 }); // dark smoke shards
+        ring(0, -6.9, 0xff3b30, 2.4, 0.6);
+      }
+      S.shake = Math.max(S.shake || 0, 0.5);
       blip(196, 0.4, 'sawtooth', 0.07);
       updHud();
       return;
@@ -514,6 +536,14 @@ export async function startBattle(ctx) {
       p.mesh.material.opacity = k;
       p.mesh.scale.setScalar(Math.max(0.05, k * (p.sc || 1)));
       if (p.t >= p.ttl) { scene.remove(p.mesh); p.mesh.material.dispose(); S.parts = S.parts.filter(q => q !== p); }
+    }
+    // impact rings
+    for (const r of [...S.rings]) {
+      r.t += dt;
+      const k = Math.max(0, 1 - r.t / r.ttl);
+      r.mesh.scale.setScalar(Math.max(0.01, r.maxR * (1 - k * k))); // ease-out expand
+      r.mesh.material.opacity = k * 0.9;
+      if (r.t >= r.ttl) { scene.remove(r.mesh); r.mesh.material.dispose(); r.mesh.geometry.dispose(); S.rings = S.rings.filter(q => q !== r); }
     }
     // balls
     for (const b of [...S.balls]) {
