@@ -426,6 +426,7 @@ export async function startBattle(ctx) {
   function fusiblePairs() {
     const seen = {};
     for (const b of S.inventory) {
+      if (b.evolved) continue; // 진화 완료 공은 재융합해도 피해가 늘지 않으므로 후보에서 제외
       const k = b.type + ':' + b.lv + ':' + b.evolved;
       if (seen[k]) return [seen[k], b];
       seen[k] = b;
@@ -835,4 +836,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+        }
