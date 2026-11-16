@@ -78,12 +78,14 @@ export const BALL_TYPES = {
   fire: { name: '화염구', color: 0xff5a1a, css: '#ff6a2a', desc: '적중 시 주변 적에게 폭발 피해.' },
   ice:  { name: '빙결구', color: 0x6ec8ff, css: '#6ec8ff', desc: '적중한 적의 다음 전진을 얼린다.' },
   bolt: { name: '번개구', color: 0xffe14d, css: '#ffe14d', desc: '적중 시 가장 가까운 다른 적에게 연쇄.' },
+  poison: { name: '독구', color: 0x7ddc3f, css: '#7ddc3f', desc: '적중한 적을 중독시켜 지속 피해.' },
 };
 export const EVOLVED = {
   fire: { name: '작열구', desc: '더 넓은 폭발과 강한 피해.' },
   ice:  { name: '혹한구', desc: '더 오래 얼리는 강력한 냉기.' },
   bolt: { name: '뇌전구', desc: '여러 적에게 튀는 연쇄 번개.' },
   iron: { name: '강철구', desc: '묵직한 일격의 강화 철구.' },
+  poison: { name: '맹독구', desc: '더 강하고 오래 퍼지는 맹독.' },
 };
 export function ballName(b) { return (b.evolved ? EVOLVED[b.type].name : BALL_TYPES[b.type].name) + ' Lv.' + b.lv; }
 export function ballDmg(b) { const base = b.evolved ? 2 + b.lv * 2 : b.lv; return base; }
