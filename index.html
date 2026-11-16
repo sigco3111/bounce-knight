@@ -117,6 +117,11 @@
   .base-card .t1 { font-weight:700; font-size:15px; color:#ece6f8; }
   .base-card .t2 { font-size:12px; color:#9aa7c4; margin-top:3px; }
   .base-card .row { display:flex; align-items:center; gap:10px; margin-top:10px; }
+  @media (max-width:360px) {
+    .base-card .row { gap:7px; }
+    .base-card .btn { padding:10px 9px; font-size:13px; white-space:nowrap; flex-shrink:0; }
+    .base-card .cost { white-space:nowrap; flex-shrink:0; }
+  }
   .base-card .cost { font-weight:700; font-size:14px; color:#ffe27a; }
   .go-wrap { position:absolute; left:0; right:0; bottom:14px; display:flex; justify-content:center; z-index:6; }
   .base-hint { position:absolute; left:0; right:0; bottom:72px; text-align:center; color:#9aa7c4; font-size:12px; z-index:6; pointer-events:none; padding:0 16px; }
