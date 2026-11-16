@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice, KNIGHTS, knightOpen, selectedKnight, validKnight } from '../js/content.js';
+import { REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice, KNIGHTS, knightOpen, selectedKnight, validKnight, validRoute, validContract, validRelicProgress, ROUTES, selectedRoute, RELICS, relicOptions, mergeDiscoveries, CONTRACTS, selectedContract, contractProgress } from '../js/content.js';
 
 const root = new URL('../', import.meta.url);
 const battle = fs.readFileSync(new URL('js/battle.js', root), 'utf8');
@@ -74,7 +74,7 @@ console.log(`PASS: ${cases} seeded card selections; distinct new balls, growth p
 
 // Save validation tests use the exact predicate; no browser storage is read or written.
 const main = fs.readFileSync(new URL('js/main.js', root), 'utf8');
-const saveBox = vm.createContext({ validRegionProgress, validKnight });
+const saveBox = vm.createContext({ validRegionProgress, validKnight, validRoute, validContract, validRelicProgress, validRoute, validContract, validRelicProgress, ROUTES, selectedRoute, RELICS, relicOptions, mergeDiscoveries, CONTRACTS, selectedContract, contractProgress });
 vm.runInContext(between(main, 'const defaults =', 'const rawSave =') + '\nglobalThis.qa={defaults,validSave};', saveBox);
 const valid = saveBox.qa.defaults();
 assert.ok(saveBox.qa.validSave(valid));
@@ -139,7 +139,7 @@ function storageFixture(initial = {}, failWrites = false, failReads = false, env
     setItem(key, value) { if (failWrites) throw new Error('quota'); writes.push([key, value]); data.set(key, value); },
     removeItem(key) { removed.push(key); data.delete(key); }
   };
-  const box = vm.createContext({ validRegionProgress, validKnight, localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
+  const box = vm.createContext({ validRegionProgress, validKnight, validRoute, validContract, validRelicProgress, localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
   vm.runInContext(between(main, 'const SAVE_KEY', "window.addEventListener('error'") + '\nglobalThis.qa={offerLegacyImport,persist,get save(){return save},get sessionOnly(){return sessionOnly}};', box);
   return { qa: box.qa, data, writes, removed, elements, reloads: () => reloads, blockWrites() { failWrites = true; } };
 }
@@ -266,7 +266,7 @@ function gemReach(z, heroZ = -2.6) {
   const position = { y: 0, z, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
   const g = { x: 0, z, ttl: 12, mesh: { rotation: { y: 0 }, position, scale: { setScalar() {} } } };
   const S = { gems: [g], heroX: 0, heroZ, now: 0, xp: 0, gemsGot: 0 };
-  const box = vm.createContext({ S, HERO_Z_MIN: -2.6, Math, dt: 0.05, scene: { remove() {} }, ring() {}, blip() {}, updHud() {}, xpNeed: () => 7, levelUp() {} });
+  const box = vm.createContext({ S, hasRelic:()=>false, HERO_Z_MIN: -2.6, Math, dt: 0.05, scene: { remove() {} }, ring() {}, blip() {}, updHud() {}, xpNeed: () => 7, levelUp() {} });
   // The last brace in this boundary closes step(), not the gem loop.
   const code = gemTick.slice(0, gemTick.lastIndexOf('\n  }'));
   for (let i = 0; i < 200 && S.gems.length; i++) vm.runInContext("(()=>{" + code + "})()", box);
@@ -412,10 +412,30 @@ assert.ok(!saveBox.qa.validSave({...valid,selectedKnight:'unknown'}));
 {
   const S={heroHP:3,shake:0,shieldSpent:false};
   const knight={id:'guardian'}, hitFlash={classList:{add(){},remove(){}},offsetWidth:0};
-  const box=vm.createContext({S,knight,Math,ctx:{norender:true},hitFlash,THREE:{Vector3:class{}},proj:()=>({x:0,y:0}),labelsC:{},popup(){},blip(){},setTimeout(){},updHud(){},gameOver(){}});
-  vm.runInContext(between(battle,'  function hurtHero(','  // ---- expedition choices:')+'\nglobalThis.hurt=hurtHero;',box);
+  const box=vm.createContext({S,knight,hasRelic:()=>false,Math,ctx:{norender:true},hitFlash,THREE:{Vector3:class{}},proj:()=>({x:0,y:0}),labelsC:{},popup(){},blip(){},setTimeout(){},updHud(){},gameOver(){}});
+  vm.runInContext(between(battle,'  function hurtHero(','  // ---- discoveries:')+'\nglobalThis.hurt=hurtHero;',box);
   box.hurt(1);assert.equal(S.heroHP,3);assert.ok(S.shieldSpent);box.hurt(1);assert.equal(S.heroHP,2);
   S.heroHP=3;S.shieldSpent=false;box.hurt(3);assert.equal(S.heroHP,1);
   knight.id='ranger';S.heroHP=3;S.shieldSpent=false;box.hurt(1);assert.equal(S.heroHP,2);
 }
 console.log('PASS: three knight selections, earned unlock fallback, optional save validation and one-use guardian damage reduction.');
+
+assert.equal(ROUTES.length,3); assert.equal(selectedRoute({}).id,'safe');
+assert.equal(selectedContract({}).id,'none'); assert.equal(RELICS.length,6);
+for (let i=0;i<100;i++) {
+ const held=['magnet','ward'];const opts=relicOptions(held,random);
+ assert.equal(opts.length,3);assert.equal(new Set(opts.map(r=>r.id)).size,3);
+ assert.ok(opts.every(r=>!held.includes(r.id)));
+}
+assert.deepEqual(mergeDiscoveries({discoveredRelics:['magnet']},['magnet','ward','unknown']),['magnet','ward']);
+for (const bad of [null,1,['bad'],['ward','ward']]) assert.equal(validRelicProgress(bad),false);
+for (const c of CONTRACTS.slice(1)) {
+ const s={kills:0,gemsGot:0,victory:false};assert.equal(contractProgress(c,s).reward,0);
+ s.kills=9;s.gemsGot=9;assert.equal(contractProgress(c,s).reward,0);
+ s.kills=10;s.gemsGot=10;s.victory=true;assert.equal(contractProgress(c,s).reward,c.reward);
+ assert.ok(contractProgress(c,s).complete);
+}
+assert.equal(contractProgress(CONTRACTS[0],{kills:99,gemsGot:99,victory:true}).reward,0);
+for(const key of ['selectedRoute','selectedContract']) assert.ok(!saveBox.qa.validSave({...valid,[key]:'bad'}));
+assert.ok(saveBox.qa.validSave({...valid,discoveredRelics:['ward','magnet'],selectedRoute:'gilded',selectedContract:'boss'}));
+console.log('PASS: three route and four contract selections; random nonduplicate relic offers excluding held; unique discovery saves; goals reward actual counts only.');
