@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadModel, HtmlLabels, popup, blip, BALL_TYPES, EVOLVED, ballName, ballDmg } from './common.js';
+import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, ballName, ballDmg } from './common.js';
 
 // 실시간 전투 (원작 BALL x PIT 리듬):
 // - 영웅이 전장 아래를 자유롭게 이동, 공은 자동 연사 스트림(인벤토리만큼 동시 비행)
@@ -665,13 +665,17 @@ export async function startBattle(ctx) {
   pauseOverlay.id = 'ov-pause'; pauseOverlay.className = 'overlay hidden';
   pauseOverlay.setAttribute('role', 'dialog'); pauseOverlay.setAttribute('aria-modal', 'true'); pauseOverlay.setAttribute('aria-labelledby', 'pause-title');
   pauseOverlay.style.boxSizing = 'border-box';
-  pauseOverlay.innerHTML = '<div class="ttl" id="pause-title">일시정지</div><div class="dsc" style="text-align:center;line-height:1.8">전투 시간이 멈췄습니다.<br>준비되면 이어서 플레이하세요.</div><button class="btn" type="button">계속하기</button>';
+  pauseOverlay.innerHTML = '<div class="ttl" id="pause-title">일시정지</div><div class="dsc" style="text-align:center;line-height:1.8">전투 시간이 멈췄습니다.<br>준비되면 이어서 플레이하세요.</div><button class="btn" type="button">계속하기</button><button class="btn sub" id="btn-audio" type="button"></button>';
   scr.appendChild(pauseOverlay);
   const resumeButton = pauseOverlay.querySelector('button');
+  const audioButton = pauseOverlay.querySelector('#btn-audio');
+  function updateAudioButton() { audioButton.textContent = isAudioMuted() ? '소리 끔 · 켜기' : '소리 켜짐 · 끄기'; audioButton.setAttribute('aria-pressed', String(isAudioMuted())); }
+  audioButton.onclick = () => { setAudioMuted(!isAudioMuted()); updateAudioButton(); };
+  updateAudioButton();
   let pausedAnimations = [];
   function pauseBattle() {
     if (S.phase !== 'play') return;
-    S.phase = 'paused'; clearControls();
+    S.phase = 'paused'; clearControls(); setAudioPaused(true);
     pausedAnimations = scr.getAnimations({ subtree: true }).filter(a => a.playState === 'running');
     for (const a of pausedAnimations) a.pause();
     pauseButton.disabled = true; pauseOverlay.classList.remove('hidden'); resumeButton.focus({ preventScroll: true });
@@ -680,13 +684,17 @@ export async function startBattle(ctx) {
     if (S.phase !== 'paused') return;
     pauseOverlay.classList.add('hidden'); pauseButton.disabled = false;
     for (const a of pausedAnimations) if (a.playState === 'paused') a.play();
-    pausedAnimations = []; S.phase = 'play'; pauseButton.focus({ preventScroll: true });
+    pausedAnimations = []; S.phase = 'play'; setAudioPaused(false); pauseButton.focus({ preventScroll: true });
   }
   pauseButton.onclick = pauseBattle; resumeButton.onclick = resumeBattle;
   // Secondary touch contacts do not synthesize click while movement is held.
   pauseButton.addEventListener('pointerup', e => { e.preventDefault(); pauseBattle(); });
   resumeButton.addEventListener('pointerup', e => { e.preventDefault(); resumeBattle(); });
-  pauseOverlay.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); resumeButton.focus(); } });
+  pauseOverlay.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    (document.activeElement === resumeButton ? audioButton : resumeButton).focus();
+  });
   window.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (S.phase === 'play') { e.preventDefault(); pauseBattle(); }
@@ -1020,4 +1028,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                             }
+    }
