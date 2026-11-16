@@ -674,6 +674,26 @@ export async function startBattle(ctx) {
   audioButton.onclick = () => { setAudioMuted(!isAudioMuted()); updateAudioButton(); };
   updateAudioButton();
   let pausedAnimations = [];
+  let contextLost = false, contextFocus = null;
+  const contextGuard = document.createElement('div');
+  contextGuard.id = 'context-loss-guard'; contextGuard.className = 'overlay hidden';
+  contextGuard.tabIndex = -1; contextGuard.setAttribute('role', 'alertdialog');
+  contextGuard.setAttribute('aria-modal', 'true'); contextGuard.setAttribute('aria-labelledby', 'context-title');
+  contextGuard.style.background = '#101019'; contextGuard.style.zIndex = '100'; contextGuard.style.padding = '24px'; contextGuard.style.boxSizing = 'border-box';
+  contextGuard.innerHTML = '<div class="ttl" id="context-title">화면 복구 대기</div><div class="dsc" style="text-align:center;line-height:1.8">전투를 멈췄습니다.<br>화면이 복구되면 이어갈 수 있습니다.</div>';
+  scr.appendChild(contextGuard);
+  contextGuard.addEventListener('keydown', e => { if (e.key === 'Tab') e.preventDefault(); });
+  canvas.addEventListener('webglcontextlost', e => {
+    e.preventDefault(); contextLost = true; contextFocus = document.activeElement;
+    pauseBattle(); clearControls(); setAudioPaused(true);
+    contextGuard.classList.remove('hidden'); contextGuard.focus({ preventScroll: true });
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    contextLost = false; contextGuard.classList.add('hidden');
+    if (S.phase === 'paused') resumeButton.focus({ preventScroll: true });
+    else if (contextFocus?.isConnected) contextFocus.focus({ preventScroll: true });
+    setAudioPaused(S.phase !== 'play');
+  });
   function pauseBattle() {
     if (S.phase !== 'play') return;
     S.phase = 'paused'; clearControls(); setAudioPaused(true);
@@ -682,7 +702,7 @@ export async function startBattle(ctx) {
     pauseButton.disabled = true; pauseOverlay.classList.remove('hidden'); resumeButton.focus({ preventScroll: true });
   }
   function resumeBattle() {
-    if (S.phase !== 'paused') return;
+    if (S.phase !== 'paused' || contextLost) return;
     pauseOverlay.classList.add('hidden'); pauseButton.disabled = false;
     for (const a of pausedAnimations) if (a.playState === 'paused') a.play();
     pausedAnimations = []; S.phase = 'play'; setAudioPaused(false); pauseButton.focus({ preventScroll: true });
@@ -945,6 +965,7 @@ export async function startBattle(ctx) {
   function loop(t) {
     if (S.over && S.phase === 'done') return;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (contextLost) { raf(loop); return; }
     if (S.phase === 'play') S.now += dt; // 선택/종료 화면에서는 전투 시계와 콤보를 멈춤
     if (S.phase === 'play' && S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
     for (let i = 0; i < sub; i++) step(dt);
@@ -1031,4 +1052,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+          }
