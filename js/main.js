@@ -26,7 +26,7 @@ function offerLegacyImport() {
   if (!old) return;
   let o; try { o = JSON.parse(old); } catch (e) { return; }
   const F = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
-  if (!(o && typeof o === 'object' && !Array.isArray(o) && F.every(k => typeof o[k] === 'number') && Object.keys(o).every(k => F.includes(k)))) return;
+  if (!(validSave(o) && Object.keys(o).every(k => F.includes(k)))) return;
   const bar = document.createElement('div');
   bar.id = 'legacy-save';
   bar.innerHTML = `이전 버전 저장 발견 (🪙 ${o.gold} · 최고 웨이브 ${o.bestWave}) <button id="legacy-yes">가져오기</button><button id="legacy-no">무시</button>`;
