@@ -115,6 +115,13 @@
   .btn:active { transform:translateY(2px); box-shadow:0 2px 0 #7c2a18; }
   .btn.sub { background:#2a3550; box-shadow:0 4px 0 #141b2c; font-size:14px; padding:11px 20px; }
 
+  #region-select { position:absolute;top:96px;left:12px;right:12px;z-index:7;text-align:center;background:#101524e8;border-radius:10px;padding:6px;box-sizing:border-box; }
+  #region-options { display:flex;gap:5px; }
+  #region-options button { flex:1;min-width:0;font:700 10px sans-serif;padding:8px 2px;color:#cbd7ed;background:#273349;border:1px solid #495870;border-radius:7px;cursor:pointer; }
+  #region-options button[aria-pressed=true] { background:#723e2b;border-color:#f0b675;color:#ffedca; }
+  #region-options button:disabled { opacity:.48;cursor:default; }
+  #region-detail { margin-top:5px;font-size:10px;line-height:14px;color:#acbddb; }
+  @media (min-aspect-ratio:6/5) { #region-select { left:56%;top:60px; } #screen-base .base-card { top:145px; } }
   /* ---- base screen ---- */
   .res-bar { position:absolute; top:12px; left:12px; right:12px; height:46px; background:rgba(16,21,36,.95);
     border-radius:14px; box-shadow:0 3px 0 rgba(0,0,0,.5); display:flex; align-items:center; padding:0 14px; gap:14px; z-index:6; }
@@ -164,6 +171,7 @@
   </div>
   <div class="title-base">전진 기지</div>
   <div id="base-labels"></div>
+  <div id="region-select"><div id="region-options" role="group" aria-label="원정 지역"></div><div id="region-detail"></div></div>
   <div class="base-card">
     <div class="t1" id="bld-name">성 Lv.1</div>
     <div class="t2" id="bld-desc">영웅 최대 HP +1</div>
