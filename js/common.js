@@ -18,13 +18,15 @@ export async function loadModel(url, opt = {}) {
   o.position.set(opt.x || 0, 0, opt.z || 0);
   const box2 = new THREE.Box3().setFromObject(o);
   o.position.y = (opt.y || 0) - box2.min.y;
+  let mixer = null;
   if (g.animations && g.animations.length && opt.poseT !== false) {
     const mx = new THREE.AnimationMixer(o);
-    const clip = g.animations.find(a => /idle/i.test(a.name)) || g.animations[0];
+    const clip = (opt.animation && g.animations.find(a => a.name === opt.animation)) || g.animations.find(a => /idle/i.test(a.name)) || g.animations[0];
     mx.clipAction(clip).play();
     mx.update(opt.poseT != null ? opt.poseT : 0.5);
+    if (opt.animate) mixer = mx;
   }
-  return { obj: o, h: size.y * s, w: size.x * s };
+  return { obj: o, h: size.y * s, w: size.x * s, mixer };
 }
 
 export function projector(camera, w, h) {
