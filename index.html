@@ -11,6 +11,10 @@
   .screen { position:absolute; inset:0; }
   .screen canvas { position:absolute; inset:0; z-index:0; }
   .hidden { display:none !important; }
+  #bt-bossbar { position:absolute; top:66px; left:14px; right:14px; z-index:5; display:flex; align-items:center; gap:8px; pointer-events:none; }
+  #bt-bossbar span { font-size:12px; font-weight:800; color:#ff8d7e; text-shadow:0 1px 0 rgba(0,0,0,.7); white-space:nowrap; }
+  #bt-bossbar .track { flex:1; height:9px; border-radius:5px; background:rgba(40,10,12,.75); box-shadow:inset 0 1px 2px rgba(0,0,0,.6), 0 0 0 1px rgba(255,90,77,.35); overflow:hidden; }
+  #bt-bossbar .track i { display:block; height:100%; width:100%; background:linear-gradient(90deg,#ff5a4d,#ff9d4d); transition:width .15s ease-out; }
   #bt-loading { position:absolute; inset:0; z-index:8; display:flex; align-items:center; justify-content:center; color:#9fb4dd; font-size:17px; font-weight:700; letter-spacing:.5px; background:#0a0f1c; animation:loadpulse 1.2s ease-in-out infinite; }
   @keyframes loadpulse { 0%,100%{opacity:.55} 50%{opacity:1} }
 
@@ -137,6 +141,7 @@
     <div class="big" id="bt-wave">웨이브 1</div>
     <div class="sub" id="bt-info">처치 0 · 🪙 0</div>
   </div>
+  <div id="bt-bossbar" class="hidden"><span>미니보스</span><div class="track"><i id="bt-bossfill"></i></div></div>
   <div id="bt-labels"></div>
   <div class="hint" id="bt-hint">드래그해서 조준 · 놓으면 발사</div>
   <div class="panel">
