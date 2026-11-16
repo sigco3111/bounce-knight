@@ -1008,6 +1008,12 @@ export async function startBattle(ctx) {
       // 시각 효과만: 수집 거리·보석 수명·경험치는 그대로 유지한다.
       g.mesh.position.y = 0.25 + Math.sin(S.now * 4 + g.x * 2) * 0.045;
       g.mesh.scale.setScalar((g.ttl < 2 ? 0.8 + Math.sin(g.ttl * 14) * 0.2 : 1) * (1 + Math.sin(S.now * 3) * 0.06));
+      // Front-row drops can be beyond the hero's forward limit. Bring them
+      // into the reachable lane without changing XP, lifetime or pickup radius.
+      if (g.z < HERO_Z_MIN) {
+        g.z = Math.min(HERO_Z_MIN, g.z + 2.4 * dt);
+        g.mesh.position.z = g.z;
+      }
       let d = Math.hypot(g.x - S.heroX, g.z - S.heroZ);
       if (d < 2.6 && d > 0.01) { // 자석: 가까우면 영웅에게 끌려옴
         const pull = 4.6 * dt;
