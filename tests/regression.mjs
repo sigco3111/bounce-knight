@@ -124,7 +124,7 @@ console.log('PASS: modeled audio cap 16, priority replacement, pause/mute suppre
 
 // Exercise original save/load/import code in an isolated in-memory storage and DOM.
 // Never run these fixtures against a browser profile or real localStorage.
-function storageFixture(initial = {}, failWrites = false, failReads = false) {
+function storageFixture(initial = {}, failWrites = false, failReads = false, environment = {}) {
   const data = new Map(Object.entries(initial)), writes = [], removed = [], elements = new Map();
   let reloads = 0;
   const make = () => ({ style: {}, children: [], removed: false,
@@ -138,11 +138,27 @@ function storageFixture(initial = {}, failWrites = false, failReads = false) {
     setItem(key, value) { if (failWrites) throw new Error('quota'); writes.push([key, value]); data.set(key, value); },
     removeItem(key) { removed.push(key); data.delete(key); }
   };
-  const box = vm.createContext({ localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } } });
+  const box = vm.createContext({ localStorage, document: { getElementById(id) { return elements.get(id) ?? null; }, createElement: make, body: make() }, location: { reload() { reloads++; } }, ...environment });
   vm.runInContext(between(main, 'const SAVE_KEY', "window.addEventListener('error'") + '\nglobalThis.qa={offerLegacyImport,persist,get save(){return save},get sessionOnly(){return sessionOnly}};', box);
   return { qa: box.qa, data, writes, removed, elements, reloads: () => reloads, blockWrites() { failWrites = true; } };
 }
 const currentKey = 'bounceknight_save_v1', legacyKey = 'bb_save_v1';
+{
+  const f = storageFixture({ '__bb_t': 'unrelated existing value', 'bounceknight_storage_probe_v1': 'existing app value' });
+  assert.equal(f.data.get('__bb_t'), 'unrelated existing value', 'startup must not overwrite/delete a pre-existing shared-origin key');
+  assert.equal(f.data.get('bounceknight_storage_probe_v1'), 'existing app value');
+  assert.ok([...f.data.keys()].every(key => !/^bounceknight_storage_probe_\d/.test(key)), 'temporary startup probe must be removed');
+}
+
+{
+  const collisionKey = 'bounceknight_storage_probe_1234_' + (0.25).toString(36).slice(2);
+  const f = storageFixture({ [collisionKey]: 'preserve me' }, false, false,
+    { Date: { now: () => 1234 }, Math: Object.assign(Object.create(Math), { random: () => 0.25 }) });
+  assert.ok(f.qa.sessionOnly);
+  assert.equal(f.data.get(collisionKey), 'preserve me');
+  assert.equal(f.writes.length, 0);
+  assert.equal(f.removed.length, 0);
+}
 const oldSave = JSON.stringify({ gold: 456, castleLv: 3, forgeLv: 2, tavernLv: 1, bestWave: 9 });
 for (const malformed of ['{', '{}', 'null', '[]', JSON.stringify({ ...valid, gold: -1 })]) {
   const f = storageFixture({ [currentKey]: malformed, [legacyKey]: oldSave });
