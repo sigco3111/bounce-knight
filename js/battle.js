@@ -64,11 +64,16 @@ export async function startBattle(ctx) {
   }
   const fitViewport = () => {
     renderer.setSize(W(), VH()); frameCamera();
+    fitBossBar();
     document.getElementById('bt-hint').style.bottom = ((panel?.offsetHeight || 120) + 24) + 'px';
   };
   window.addEventListener('resize', fitViewport);
   if (panel) new ResizeObserver(fitViewport).observe(panel);
-  const fitBossBar = () => { document.getElementById('bt-bossbar').style.top = ((topHud?.offsetHeight || 64) + 2) + 'px'; };
+  function fitBossBar() {
+    const top = (topHud?.offsetHeight || 64) + 2;
+    document.getElementById('bt-bossbar').style.top = top + 'px';
+    scr.style.setProperty('--banner-y', Math.max(24, Math.min(VH() - 48, Math.max(top + 56, VH() * 0.32))) + 'px');
+  };
   if (topHud) new ResizeObserver(fitBossBar).observe(topHud);
   fitBossBar();
   frameCamera();
@@ -226,6 +231,7 @@ export async function startBattle(ctx) {
     return e;
   }
   function updEnemyLabel(e) {
+    e.label.el.classList.toggle('hidden', e.type === 'boss'); // 보스 HP는 상단 전용 바에서만 표시
     e.label.el.innerHTML = `<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
   function milestone(w, boss = false) { // wave-clear reward, real gold + heal, not just UI
@@ -425,6 +431,11 @@ export async function startBattle(ctx) {
     const boss = S.enemies.find(o => o.type === 'boss');
     if (!boss) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
+    const hp = Math.max(0, Math.ceil(boss.hp));
+    boss.shownHP = hp;
+    el.querySelector('span').textContent = `미니보스 ${hp}/${boss.maxHp}`;
+    el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', '미니보스 HP');
+    el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', String(boss.maxHp)); el.setAttribute('aria-valuenow', String(hp));
     document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
   }
   function rmvEnemy(e) {
@@ -795,6 +806,7 @@ export async function startBattle(ctx) {
       if (e.poison) { // 중독 지속 피해
         e.poison.t -= dt;
         e.hp -= e.poison.dps * dt;
+        if (e.type === 'boss' && Math.max(0, Math.ceil(e.hp)) !== e.shownHP) updBossBar();
         e.poison.acc += e.poison.dps * dt;
         if (e.poison.acc >= 1) {
           if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + Math.round(e.poison.acc), 'poison'); }
@@ -889,9 +901,12 @@ export async function startBattle(ctx) {
     }
     if (!ctx.norender || S.fcount % 30 === 0) {
       const placed = [];
+      const bossBar = document.getElementById('bt-bossbar');
+      const labelTop = (bossBar.classList.contains('hidden') ? topHud.getBoundingClientRect().bottom : bossBar.getBoundingClientRect().bottom) + 4;
       for (const e of [...S.enemies].sort((a, b2) => a.x - b2.x)) {
+        if (e.type === 'boss') continue;
         const p = proj(new THREE.Vector3(e.x, e.h + 0.55, e.z));
-        let px = p.x, py = p.y - 22;
+        let px = Math.max(20, Math.min(W() - 20, p.x)), py = Math.max(labelTop, p.y - 22);
         while (placed.some(q => Math.abs(q.x - px) < 40 && Math.abs(q.y - py) < 16)) py += 16;
         placed.push({ x: px, y: py });
         labels.place(e.label, px, py);
@@ -945,4 +960,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-  }
+                  }
