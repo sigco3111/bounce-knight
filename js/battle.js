@@ -375,7 +375,13 @@ export async function startBattle(ctx) {
     el.classList.remove('hidden');
     document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
   }
-  function rmvEnemy(e) { scene.remove(e.obj); if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; } labels.remove(e.label); }
+  function rmvEnemy(e) {
+    scene.remove(e.obj);
+    if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; }
+    for (const mat of e.mats || []) mat.dispose(); // 적별 복제 재질만 해제. 공유 모델 지오메트리/텍스처는 유지
+    e.mats = [];
+    labels.remove(e.label);
+  }
   function killEnemy(e, kc = 0xffd76a) { // 처치 파편은 죽인 공 타입 색(기본 금색): 처치 주체가 색으로 읽힘
     S.enemies = S.enemies.filter(x => x !== e);
     rmvEnemy(e);
@@ -850,4 +856,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+}
