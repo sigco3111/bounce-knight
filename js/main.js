@@ -4,27 +4,26 @@ import { startBattle } from './battle.js';
 const SAVE_KEY = 'bounceknight_save_v1'; // unique under sigco3111.github.io (origin is shared with other games)
 const OLD_KEY = 'bb_save_v1';
 const storage = (() => { try { const t = '__bb_t'; localStorage.setItem(t, '1'); localStorage.removeItem(t); return localStorage; } catch (e) { const mem = {}; return { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } }; } })();
-let save = JSON.parse(storage.getItem(SAVE_KEY) || 'null');
-if (!save) {
-  // One-time migration from the old generic key. This origin is shared with
-  // other games, so import only when the value matches this game's exact save
-  // schema, and never delete the old key (it may belong to another game).
-  const old = storage.getItem(OLD_KEY);
-  if (old) {
-    try {
-      const o = JSON.parse(old);
-      const F = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
-      if (o && typeof o === 'object' && !Array.isArray(o)
-          && F.every(k => typeof o[k] === 'number') && Object.keys(o).every(k => F.includes(k))) {
-        save = o;
-        storage.setItem(SAVE_KEY, JSON.stringify(o));
-      }
-    } catch (e) { /* not this game's save; leave it untouched */ }
-  }
-}
-save = save || {
+const save = JSON.parse(storage.getItem(SAVE_KEY) || 'null') || {
   gold: 120, castleLv: 1, forgeLv: 1, tavernLv: 1, bestWave: 0,
 };
+// A previous build used the generic key OLD_KEY on this shared origin. Never
+// import it automatically (schema match does not prove ownership) and never
+// delete it (it may belong to another game). Offer the user a one-time choice.
+function offerLegacyImport() {
+  if (storage.getItem(SAVE_KEY)) return;
+  const old = storage.getItem(OLD_KEY);
+  if (!old) return;
+  let o; try { o = JSON.parse(old); } catch (e) { return; }
+  const F = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
+  if (!(o && typeof o === 'object' && !Array.isArray(o) && F.every(k => typeof o[k] === 'number') && Object.keys(o).every(k => F.includes(k)))) return;
+  const bar = document.createElement('div');
+  bar.id = 'legacy-save';
+  bar.innerHTML = `이전 버전 저장 발견 (🪙 ${o.gold} · 최고 웨이브 ${o.bestWave}) <button id="legacy-yes">가져오기</button><button id="legacy-no">무시</button>`;
+  document.getElementById('screen-base').appendChild(bar);
+  document.getElementById('legacy-yes').onclick = () => { Object.assign(save, o); persist(); location.reload(); };
+  document.getElementById('legacy-no').onclick = () => { persist(); bar.remove(); };
+}
 function persist() { storage.setItem(SAVE_KEY, JSON.stringify(save)); }
 
 window.addEventListener('error', e => { const s = document.getElementById('state'); s.dataset.err = (e.message||'') + ' @' + (e.filename||'') + ':' + e.lineno; });
@@ -44,6 +43,7 @@ async function showBase() {
   if (current === 'base') return;
   current = 'base';
   await startBase({ save, persist, onSortie: showBattle });
+  offerLegacyImport();
   if (auto) document.getElementById('btn-sortie').click();
 }
 async function showBattle() {
