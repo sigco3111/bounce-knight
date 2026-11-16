@@ -115,7 +115,7 @@ export async function startBattle(ctx) {
     phase: 'play', wave: 0, kills: 0, gold: 0, xp: 0, level: 1,
     heroHP: ctx.heroMaxHP(), heroX: 0, heroZ: HERO_Z,
     inventory: [0, 1, 2].map(() => ({ type: 'iron', lv: 1, evolved: false })),
-    dmgMul: ctx.dmgMul(), balls: [], enemies: [], gems: [],
+    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [],
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
@@ -286,6 +286,8 @@ export async function startBattle(ctx) {
     const owned = S.inventory.filter(b => !b.evolved);
     if (owned.length) { const b = owned[Math.floor(Math.random() * owned.length)]; pool.push({ kind: 'up', ball: b }); }
     pool.push({ kind: 'mul' });
+    if (S.fireMul > 0.6) pool.push({ kind: 'haste' });
+    if (S.heroHP < 5) pool.push({ kind: 'life' });
     const pair = fusiblePairs();
     if (pair) pool.push({ kind: 'fuse', pair });
     const picks = [];
@@ -302,6 +304,8 @@ export async function startBattle(ctx) {
       if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc; }
       else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = '피해량이 오른다.'; }
       else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = '모든 공 피해량 +20%'; }
+      else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = '발사 주기 -15%'; }
+      else if (c.kind === 'life') { ic = '#ff7a9d'; t1 = '패시브: 수호 심장'; t2 = 'HP를 1 회복한다 (최대 5).'; }
       else { ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + c.pair[0].lv; t2 = '두 공을 합쳐 상위 공으로 진화시킨다.'; }
       const d = document.createElement('div');
       d.className = 'card-pick';
@@ -323,6 +327,8 @@ export async function startBattle(ctx) {
     if (c.kind === 'new') S.inventory.push({ type: c.type, lv: 1, evolved: false });
     else if (c.kind === 'up') c.ball.lv++;
     else if (c.kind === 'mul') S.dmgMul += 0.2;
+    else if (c.kind === 'haste') S.fireMul *= 0.85;
+    else if (c.kind === 'life') S.heroHP = Math.min(5, S.heroHP + 1);
     else if (c.kind === 'fuse') {
       S.inventory = S.inventory.filter(b => b !== c.pair[0] && b !== c.pair[1]);
       const nb = { type: c.pair[0].type, lv: c.pair[0].lv, evolved: true }; // fusion keeps the pair's level: evolving always feels like an upgrade
@@ -354,7 +360,10 @@ export async function startBattle(ctx) {
   function updHud() {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
     document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave) + (bossAlive ? ' · 보스' : '');
-    document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 연속x${S.combo}` : '');
+    const pb = [];
+    if (S.dmgMul > 1) pb.push('공격+' + Math.round((S.dmgMul - 1) * 100) + '%');
+    if (S.fireMul < 1) pb.push('연사x' + Math.round(Math.log(S.fireMul) / Math.log(0.85)));
+    document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 연속x${S.combo}` : '') + (pb.length ? ' · ' + pb.join(' · ') : '');
     document.getElementById('bt-xp').style.width = Math.min(100, S.xp / xpNeed() * 100) + '%';
     document.getElementById('bt-hearts').textContent = '♥'.repeat(Math.max(0, S.heroHP)) || '💀';
     document.getElementById('bt-balls').innerHTML = S.inventory.map(b =>
@@ -434,7 +443,7 @@ export async function startBattle(ctx) {
     if (S.fireTimer <= 0) {
       const inFlight = new Set(S.balls.map(b => b.def));
       const loaded = S.inventory.find(b => !inFlight.has(b));
-      if (loaded) { fireBall(loaded); S.fireTimer = FIRE_INTERVAL; }
+      if (loaded) { fireBall(loaded); S.fireTimer = FIRE_INTERVAL * S.fireMul; }
       else S.fireTimer = 0.12;
     }
     // balls
@@ -551,7 +560,7 @@ export async function startBattle(ctx) {
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
       aim: Math.round(S.aimDir * 100) / 100,
-      evolvedHits: S.evolvedHits, lastEvolvedDmg: S.lastEvolvedDmg,
+      evolvedHits: S.evolvedHits, lastEvolvedDmg: S.lastEvolvedDmg, fireMul: Math.round(S.fireMul * 1000) / 1000,
       inv: S.inventory.map(b => b.type + b.lv + (b.evolved ? 'E' : '')),
     });
     if (S.shake > 0) {
