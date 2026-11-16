@@ -18,6 +18,7 @@ const ENEMY_R = 0.42;
 const SPEED = 10;
 const FIRE_INTERVAL = 0.5;
 const TRAIL_N = 12;
+const TRAIL_LENGTH = 1.2; // world-space limit: low frame rates must not stretch a ball into a long line
 const SPAWN_INTERVAL = 6.5;
 const MARCH_SPEED = 0.32;  // 초당 전진
 
@@ -840,11 +841,24 @@ export async function startBattle(ctx) {
       if (b.trail) {
         b.trailPts.unshift([b.x, 0.3, b.z]);
         if (b.trailPts.length > TRAIL_N) b.trailPts.pop();
+        let trailLength = 0;
+        for (let i = 1; i < b.trailPts.length; i++) {
+          const p = b.trailPts[i - 1], q = b.trailPts[i];
+          const segment = Math.hypot(q[0] - p[0], q[2] - p[2]);
+          if (trailLength + segment >= TRAIL_LENGTH) {
+            const k = (TRAIL_LENGTH - trailLength) / segment;
+            b.trailPts[i] = [p[0] + (q[0] - p[0]) * k, 0.3, p[2] + (q[2] - p[2]) * k];
+            b.trailPts.length = i + 1; break;
+          }
+          trailLength += segment;
+        }
         const pa = b.trail.geometry.attributes.position, ca = b.trail.geometry.attributes.color, nn = b.trailPts.length;
         const cr = ((BALL_TYPES[b.def.type].color >> 16) & 255) / 255, cg = ((BALL_TYPES[b.def.type].color >> 8) & 255) / 255, cb = (BALL_TYPES[b.def.type].color & 255) / 255;
+        let distance = 0;
         for (let i = 0; i < TRAIL_N; i++) {
           const q = b.trailPts[Math.min(i, nn - 1)];
-          const k = 1 - i / (TRAIL_N - 1), kk = k * k;
+          if (i > 0) { const p = b.trailPts[Math.min(i - 1, nn - 1)]; distance += Math.hypot(q[0] - p[0], q[2] - p[2]); }
+          const k = Math.max(0, 1 - distance / TRAIL_LENGTH), kk = k * k;
           pa.setXYZ(i, q[0], q[1], q[2]); ca.setXYZ(i, cr * kk, cg * kk, cb * kk);
         }
         pa.needsUpdate = true; ca.needsUpdate = true;
@@ -1054,4 +1068,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                     }
+        }
