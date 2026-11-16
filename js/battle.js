@@ -52,10 +52,19 @@ export async function startBattle(ctx) {
   scene.fog = new THREE.Fog(0x0b0f16, 10, 26);
 
   const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 80);
-  window.addEventListener('resize', () => { renderer.setSize(W(), H()); camera.aspect = W() / H(); camera.updateProjectionMatrix(); });
-  camera.position.set(0, 12.9, 12.2);
-  camera.lookAt(0, 0, -1.7);
-  camera.updateMatrixWorld(true);
+  let camCk = 1;
+  function frameCamera() { // 짧은 가로 화면: 렌더 창을 아래로 잘라 영웅 줄이 하단 HUD 위에 오게(장면 자체는 그대로)
+    const a = W() / H();
+    camera.aspect = a;
+    if (a > 1.2) { const pad = Math.round(H() * 0.26); camera.setViewOffset(W(), H() + pad, 0, pad, W(), H()); }
+    else camera.clearViewOffset();
+    camCk = a > 1.2 ? 1.08 : 1; // 안개 범위 안에서 살짝 물러나 상단 시야 확보
+    camera.position.set(0, 12.9 * camCk, 12.2 * camCk);
+    camera.lookAt(0, 0, -1.7);
+    camera.updateMatrixWorld(true);
+  }
+  window.addEventListener('resize', () => { renderer.setSize(W(), H()); frameCamera(); });
+  frameCamera();
 
   scene.add(new THREE.AmbientLight(0x5d6d96, 1.4));
   scene.add(new THREE.HemisphereLight(0x566a92, 0x342a20, 0.95));
@@ -498,8 +507,10 @@ export async function startBattle(ctx) {
     return Math.max(-1.25, Math.min(1.25, a));
   }
   const touches = { move: null, aim: null };
+  let hintGone = false;
   canvas.addEventListener('pointerdown', e => {
     if (S.phase !== 'play') return;
+    if (!hintGone) { hintGone = true; document.getElementById('bt-hint')?.classList.add('hidden'); } // 첫 조작 후 안내 숨김: 영웅/필드를 가리지 않게
     const half = e.clientX < window.innerWidth / 2 ? 'move' : 'aim';
     touches[half] = e.pointerId;
     if (half === 'move') S.moveTarget = groundPoint(e);
@@ -732,8 +743,8 @@ export async function startBattle(ctx) {
     if (S.shake > 0) {
       S.shake -= dt;
       const m = S.shake * 1.5;
-      camera.position.set((Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
-    } else if (S.shake !== 0) { S.shake = 0; camera.position.set(0, 12.9, 12.2); }
+      camera.position.set((Math.random() - 0.5) * m, 12.9 * camCk + (Math.random() - 0.5) * m * 0.6, 12.2 * camCk);
+    } else if (S.shake !== 0) { S.shake = 0; camera.position.set(0, 12.9 * camCk, 12.2 * camCk); }
     if (!ctx.norender) renderer.render(scene, camera);
     raf(loop);
   }
@@ -769,4 +780,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                   }
+      }
