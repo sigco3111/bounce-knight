@@ -75,7 +75,8 @@
     border-radius:20px 20px 0 0; box-shadow:0 -4px 0 rgba(0,0,0,.5); z-index:6; padding:12px 16px; }
   .lvl-row { display:flex; align-items:center; gap:10px; }
   .lvl-badge { background:#b03030; color:#ffe9e6; font-weight:700; font-size:13px; border-radius:10px; padding:4px 10px; box-shadow:0 3px 0 #6e1b1b; }
-  .xp { flex:1; height:12px; background:#0f141f; border-radius:6px; overflow:hidden; }
+  .xp { position:relative; flex:1; height:16px; background:#0f141f; border-radius:6px; overflow:hidden; }
+  .xp span { position:absolute; inset:0; display:grid; place-items:center; color:#e4f7ff; font-size:10px; line-height:16px; font-weight:700; text-shadow:0 1px 2px #000,0 0 3px #000; }
   .xp i { display:block; height:100%; width:0%; background:linear-gradient(#b06ae0,#7b3fb0); border-radius:6px; transition:width .3s; }
   .hearts { font-size:15px; letter-spacing:2px; color:#ff5a5a; text-shadow:0 2px 0 rgba(0,0,0,.5); }
   .ball-row { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; }
@@ -179,7 +180,7 @@
   <div class="panel">
     <div class="lvl-row">
       <div class="lvl-badge" id="bt-lv">Lv.1</div>
-      <div class="xp"><i id="bt-xp"></i></div>
+      <div class="xp" role="progressbar" aria-label="경험치" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0"><i id="bt-xp"></i><span id="bt-xp-text"></span></div>
       <div class="hearts" id="bt-hearts">♥♥♥</div>
     </div>
     <div class="ball-row" id="bt-balls"></div>
