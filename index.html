@@ -86,6 +86,15 @@
   .cards { display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px; }
   .card-pick { background:#1b2334; border-radius:14px; padding:13px 16px; box-shadow:0 4px 0 rgba(0,0,0,.5);
     display:flex; align-items:center; gap:12px; cursor:pointer; border:2px solid transparent; }
+  #ov-levelup { box-sizing:border-box; padding:22px 18px; overflow-y:auto; gap:10px; }
+  #ov-levelup .cards { width:100%; max-width:440px; gap:8px; flex-shrink:0; }
+  #ov-levelup .card-pick { padding:11px 13px; min-height:44px; }
+  #ov-levelup .t1, #ov-levelup .t2 { word-break:keep-all; overflow-wrap:anywhere; }
+  @media (max-height:540px) {
+    #ov-levelup { justify-content:flex-start; padding:12px 18px; gap:7px; }
+    #ov-levelup .cards { width:100%; max-width:720px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    #ov-levelup .card-pick { padding:9px 11px; }
+  }
   .card-pick:active { border-color:#f0a45a; }
   .card-pick .ic { width:34px; height:34px; border-radius:50%; flex:none; box-shadow:0 0 10px rgba(255,120,40,.35); }
   .card-pick .t1 { font-weight:700; font-size:14px; color:#ece6f8; }
@@ -156,7 +165,7 @@
   </div>
   <div class="overlay hidden" id="ov-levelup">
     <div class="ttl">레벨 업!</div>
-    <div class="dsc">하나를 선택하세요</div>
+    <div class="dsc">4장 중 하나를 선택하세요</div>
     <div class="cards" id="lv-cards"></div>
   </div>
   <div class="overlay hidden" id="ov-over">
