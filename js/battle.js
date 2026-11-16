@@ -36,6 +36,7 @@ function doubleSide(root) {
 export async function startBattle(ctx) {
   // 적 모델을 전투 전에 준비: 진행 중 다운로드 실패로 보스가 누락되지 않게 한다.
   await Promise.all([...new Set(Object.values(ENEMY_DEFS).map(def => def.u))].map(url => loadModel(url, { poseT: false })));
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const panel = document.querySelector('#screen-battle > .panel');
   const topHud = document.querySelector('#screen-battle > .hud-top');
@@ -936,7 +937,8 @@ export async function startBattle(ctx) {
     for (let i = 0; i < sub; i++) step(dt);
     const followX = W() / H() > 1.2 ? 0 : S.heroX * 0.6; // 세로 화면 가장자리: 부분 수평 추적으로 무기까지 프레임 안에 유지
     if (S.phase === 'play') { // pause holds the camera too, not only combat state
-      if (S.shake > 0) {
+      if (reducedMotion.matches) { S.shake = 0; camera.position.set(followX, 12.9, 12.2); }
+      else if (S.shake > 0) {
         S.shake -= dt;
         const m = S.shake * 1.5;
         camera.position.set(followX + (Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
@@ -1014,4 +1016,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+      }
