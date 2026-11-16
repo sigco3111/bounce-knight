@@ -330,7 +330,7 @@ export async function startBattle(ctx) {
     }
     updEnemyLabel(e);
     updBossBar();
-    for (const o of [...S.enemies]) if (o.hp <= 0) killEnemy(o);
+    for (const o of [...S.enemies]) if (o.hp <= 0) killEnemy(o, BALL_TYPES[src.def.type].color);
   }
   function updBossBar() { // 미니보스 전용 상단 체력바: 보스가 살아있는 동안만 표시
     const el = document.getElementById('bt-bossbar');
@@ -340,13 +340,13 @@ export async function startBattle(ctx) {
     el.classList.remove('hidden');
     document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
   }
-  function killEnemy(e) {
+  function killEnemy(e, kc = 0xffd76a) { // 처치 파편은 죽인 공 타입 색(기본 금색): 처치 주체가 색으로 읽힘
     S.enemies = S.enemies.filter(x => x !== e);
     scene.remove(e.obj); labels.remove(e.label);
     S.kills++;
     if (e.type === 'boss') updBossBar();
     const bsc = e.type === 'boss' ? 1.7 : 1;
-    burst(e.x, e.z, 0xffd76a, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
+    burst(e.x, e.z, kc, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
     burst(e.x, e.z, 0xfff6dd, e.type === 'boss' ? 8 : 5, 2.5, 0.9, { sc: bsc });
     S.shake = Math.max(S.shake || 0, 0.09);
     S.combo = (S.now - S.comboT <= 4) ? S.combo + 1 : 1; // kill streak within 4s
@@ -643,7 +643,7 @@ export async function startBattle(ctx) {
           e.poison.acc = 0;
           updEnemyLabel(e);
         }
-        if (e.hp <= 0) { killEnemy(e); continue; }
+        if (e.hp <= 0) { killEnemy(e, 0x7ddc3f); continue; } // 중독사는 독 색 파편
         if (e.poison.t <= 0) e.poison = null;
       }
       if (e.frozen > 0) { e.frozen -= dt; continue; }
@@ -769,4 +769,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+                                   }
