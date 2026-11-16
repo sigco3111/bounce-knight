@@ -1,4 +1,4 @@
-import { REGIONS, regionOpen, KNIGHTS, knightOpen, selectedKnight, ROUTES, selectedRoute, RELICS, CONTRACTS, selectedContract } from './content.js';
+import { ENEMY_GUIDE, REGIONS, regionOpen, KNIGHTS, knightOpen, selectedKnight, ROUTES, selectedRoute, RELICS, CONTRACTS, selectedContract } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, nextExpeditionPlan } from './common.js';
 
@@ -81,6 +81,7 @@ export async function startBase(ctx) {
       b.onclick = () => { ctx.save.selectedContract = c.id; ctx.persist(); updateRoute(); renderPrep(); prep.querySelector(`[data-contract=${c.id}]`)?.focus(); }; contractCards.appendChild(b);
     }
     const found = ctx.save.discoveredRelics || [];
+    document.getElementById('enemy-guide').textContent = ENEMY_GUIDE.map(e => `${e.name} · ${e.wave}웨이브\n${e.desc}`).join('\n\n');
     document.getElementById('codex-title').textContent = `유물 도감 ${found.length}/${RELICS.length}`;
     document.getElementById('codex-list').textContent = RELICS.map(r => found.includes(r.id) ? r.name + ': ' + r.desc : '미발견 유물').join('\n');
   }
