@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadModel, HtmlLabels } from './common.js';
+import { loadModel, HtmlLabels, nextExpeditionPlan } from './common.js';
 
 const BLD = [
   { key: 'castleLv', name: '성', desc: lv => `영웅 최대 HP ${3 + lv - 1} → ${3 + lv}` },
@@ -147,6 +147,9 @@ export async function startBase(ctx) {
     upgrade.style.opacity = affordable ? '1' : '0.65';
     upgrade.style.cursor = affordable ? 'pointer' : 'not-allowed';
     upgrade.setAttribute('aria-describedby', 'bld-desc bld-cost');
+    const plan = nextExpeditionPlan(ctx.save);
+    document.getElementById('base-goal').textContent = `다음 목표: 웨이브 ${plan.target}${plan.target % 10 === 0 ? ' · 보스 도전' : ''}`;
+    document.getElementById('base-growth').textContent = `추천 ${plan.name}: ${plan.benefit} · ${plan.shortage ? plan.shortage + '골드 더' : '강화 가능'}`;
     reflowLabels();
   }
   document.getElementById('bld-next').onclick = () => { sel = (sel + 1) % BLD.length; upd(); };
