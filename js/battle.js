@@ -634,6 +634,7 @@ export async function startBattle(ctx) {
   }
 
   // ---- HUD ----
+  let inventoryStamp = '';
   function updHud() {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
     document.getElementById('bt-wave').textContent = '웨이브 ' + Math.max(1, S.wave) + (bossAlive ? ' · 보스' : '');
@@ -649,8 +650,20 @@ export async function startBattle(ctx) {
     const hp = Math.max(0, S.heroHP), hearts = document.getElementById('bt-hearts');
     hearts.textContent = hp > 5 ? `♥ ×${hp}` : ('♥'.repeat(hp) || '💀');
     hearts.style.whiteSpace = 'nowrap'; hearts.setAttribute('role', 'img'); hearts.setAttribute('aria-label', `남은 HP ${hp}`);
-    document.getElementById('bt-balls').innerHTML = S.inventory.map(b =>
-      `<span class="ball-chip"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}</span>`).join('');
+    const groups = new Map();
+    for (const b of S.inventory) {
+      const key = b.type + ':' + b.lv + ':' + !!b.evolved;
+      if (groups.has(key)) groups.get(key).count++;
+      else groups.set(key, { ball: b, count: 1 });
+    }
+    const stamp = [...groups].map(([key, g]) => key + ':' + g.count).join('|');
+    if (stamp !== inventoryStamp) {
+      inventoryStamp = stamp;
+      const row = document.getElementById('bt-balls');
+      row.setAttribute('aria-label', `보유 공 ${S.inventory.length}개`);
+      row.innerHTML = [...groups.values()].map(({ ball: b, count }) =>
+        `<span class="ball-chip" data-count="${count}" aria-label="${ballName(b)} ${count}개"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}${count > 1 ? ' ×' + count : ''}</span>`).join('');
+    }
   }
   document.getElementById('bt-hint').textContent = '왼쪽 드래그: 이동 · 오른쪽 드래그: 조준 (공은 자동 발사)';
 
@@ -1095,4 +1108,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-        }
+                                                            }
