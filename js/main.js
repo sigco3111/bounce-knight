@@ -8,7 +8,11 @@ const storage = {
   getItem: k => { try { return localStorage.getItem(k); } catch (_) { storageAvailable = false; return null; } },
   setItem: (k, v) => localStorage.setItem(k, v),
 };
-try { const t = '__bb_t'; storage.setItem(t, '1'); localStorage.removeItem(t); } catch (_) { storageAvailable = false; }
+try {
+  const t = 'bounceknight_storage_probe_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  if (storage.getItem(t) !== null) throw new Error('storage probe key already exists');
+  storage.setItem(t, '1'); localStorage.removeItem(t); // never overwrite an existing key on this shared origin
+} catch (_) { storageAvailable = false; }
 const defaults = () => ({ gold: 120, castleLv: 1, forgeLv: 1, tavernLv: 1, bestWave: 0 });
 const saveFields = ['gold', 'castleLv', 'forgeLv', 'tavernLv', 'bestWave'];
 const validSave = o => o && typeof o === 'object' && !Array.isArray(o) &&
