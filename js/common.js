@@ -110,9 +110,34 @@ export const BALL_TYPES = {
   fire: { name: '화염구', color: 0xff5a1a, css: '#ff6a2a', desc: '주변 폭발. 중독된 적은 독을 소모해 점화.' },
   ice:  { name: '빙결구', color: 0x6ec8ff, css: '#6ec8ff', desc: '적을 동결. 철구로 치면 동결을 깨고 추가 피해.' },
   bolt: { name: '번개구', color: 0xffe14d, css: '#ffe14d', desc: '적중 시 가장 가까운 다른 적에게 연쇄.' },
+  wind: { name: '바람구', color: 0x74edcc, css: '#74edcc', desc: '적을 뒤로 밀침. 화염/독과 이종 융합.' },
+  gravity: { name: '중력구', color: 0xb38aff, css: '#b38aff', desc: '주변 적을 끌어모음. 빙결과 이종 융합.' },
+  pierce: { name: '관통구', color: 0xf3b5dd, css: '#f3b5dd', desc: '적 관통, 같은 적은 발사당 1회. 번개와 이종 융합.' },
+  firewind: { name: '화염 폭풍구', color: 0xff986c, css: '#ff986c', effects: ['fire', 'wind'], desc: '폭발과 밀치기. 화염+바람 이종 융합.' },
+  frostwell: { name: '서리 중력구', color: 0xb9c8ff, css: '#b9c8ff', effects: ['ice', 'gravity'], desc: '빙결과 끌어모으기. 빙결+중력 이종 융합.' },
+  stormneedle: { name: '뇌전 관통구', color: 0xfff18b, css: '#fff18b', effects: ['bolt', 'pierce'], desc: '연쇄와 관통. 번개+관통 이종 융합.' },
+  venomgale: { name: '맹독 돌풍구', color: 0xb2ee68, css: '#b2ee68', effects: ['poison', 'wind'], desc: '중독과 밀치기. 독+바람 이종 융합.' },
   poison: { name: '독구', color: 0x7ddc3f, css: '#7ddc3f', desc: '지속 피해. 화염으로 치면 남은 독 1초분 즉시 피해.' },
 };
+export const BASE_ELEMENTS = ['fire', 'ice', 'bolt', 'poison', 'wind', 'gravity', 'pierce'];
+export const CROSS_FUSIONS = [
+  { types: ['fire', 'wind'], result: 'firewind' },
+  { types: ['ice', 'gravity'], result: 'frostwell' },
+  { types: ['bolt', 'pierce'], result: 'stormneedle' },
+  { types: ['poison', 'wind'], result: 'venomgale' },
+];
+export function ballHas(def, effect) { return def.type === effect || (BALL_TYPES[def.type]?.effects || []).includes(effect); }
+export function crossFusion(inventory) {
+  for (const recipe of CROSS_FUSIONS) {
+    const pair = recipe.types.map(type => inventory.find(b => b.type === type && !b.evolved && !b.hybrid));
+    if (pair.every(Boolean)) return { pair, type: recipe.result, lv: Math.min(...pair.map(b => b.lv)) };
+  }
+  return null;
+}
 export const EVOLVED = {
+  wind: { name: '폭풍구', desc: '더 강한 밀치기와 피해.' },
+  gravity: { name: '블랙홀구', desc: '더 넓고 강하게 끌어모음.' },
+  pierce: { name: '유성 관통구', desc: '높은 피해로 적을 관통.' },
   fire: { name: '작열구', desc: '더 넓은 폭발과 강한 피해.' },
   ice:  { name: '혹한구', desc: '더 오래 얼리는 강력한 냉기.' },
   bolt: { name: '뇌전구', desc: '여러 적에게 튀는 연쇄 번개.' },
@@ -120,14 +145,14 @@ export const EVOLVED = {
   poison: { name: '맹독구', desc: '더 강하고 오래 퍼지는 맹독.' },
 };
 export function ballName(b) { return (b.evolved ? EVOLVED[b.type].name : BALL_TYPES[b.type].name) + ' Lv.' + b.lv; }
-export function ballDmg(b) { const base = b.evolved ? 2 + b.lv * 2 : b.lv; return base; }
+export function ballDmg(b) { const base = (b.evolved || b.hybrid) ? 2 + b.lv * 2 : b.lv; return base; }
 
 export function isLite() { return new URLSearchParams(location.search).has('lite'); }
 
 // Reactions consume the prior status once; they are not multiplied by direct-hit upgrades.
 export function ballReaction(def, enemy) {
   if (def.type === 'iron' && enemy.frozen > 0) return { kind: 'shatter', damage: def.evolved ? 4 : 2 };
-  if (def.type === 'fire' && enemy.poison?.t > 0) return { kind: 'ignite', damage: Math.max(1, Math.ceil(enemy.poison.dps * Math.min(1, enemy.poison.t))) };
+  if (ballHas(def, 'fire') && enemy.poison?.t > 0) return { kind: 'ignite', damage: Math.max(1, Math.ceil(enemy.poison.dps * Math.min(1, enemy.poison.t))) };
   return null;
 }
 
