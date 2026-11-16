@@ -678,6 +678,9 @@ export async function startBattle(ctx) {
     pausedAnimations = []; S.phase = 'play'; pauseButton.focus({ preventScroll: true });
   }
   pauseButton.onclick = pauseBattle; resumeButton.onclick = resumeBattle;
+  // Secondary touch contacts do not synthesize click while movement is held.
+  pauseButton.addEventListener('pointerup', e => { e.preventDefault(); pauseBattle(); });
+  resumeButton.addEventListener('pointerup', e => { e.preventDefault(); resumeBattle(); });
   pauseOverlay.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); resumeButton.focus(); } });
   window.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
@@ -1011,4 +1014,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-    }
+        }
