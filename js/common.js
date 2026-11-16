@@ -63,8 +63,21 @@ export function popup(container, x, y, text, cls = '') {
   d.addEventListener('animationend', () => d.remove());
 }
 
+const AUDIO_KEY = 'bounceknight_audio_muted_v1';
+let audioMuted = false, audioPaused = false;
+try { audioMuted = localStorage.getItem(AUDIO_KEY) === '1'; } catch (_) { /* session setting only */ }
+const voices = new Set();
+function stopVoices() { for (const o of voices) { try { o.stop(); } catch (_) {} } }
+export const isAudioMuted = () => audioMuted;
+export function setAudioMuted(muted) {
+  audioMuted = !!muted;
+  if (audioMuted) stopVoices();
+  try { localStorage.setItem(AUDIO_KEY, audioMuted ? '1' : '0'); } catch (_) { /* keep session choice */ }
+}
+export function setAudioPaused(paused) { audioPaused = !!paused; if (audioPaused) stopVoices(); }
 let actx = null;
 export function blip(f = 440, d = 0.05, type = 'square', g = 0.035) {
+  if (audioMuted || audioPaused) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === 'suspended') actx.resume();
@@ -73,6 +86,8 @@ export function blip(f = 440, d = 0.05, type = 'square', g = 0.035) {
     gn.gain.setValueAtTime(g, actx.currentTime);
     gn.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + d);
     o.connect(gn); gn.connect(actx.destination);
+    voices.add(o);
+    o.onended = () => { voices.delete(o); o.disconnect(); gn.disconnect(); };
     o.start(); o.stop(actx.currentTime + d);
   } catch (e) { /* no audio */ }
 }
