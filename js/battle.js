@@ -692,7 +692,7 @@ export async function startBattle(ctx) {
     contextLost = false; contextGuard.classList.add('hidden');
     if (S.phase === 'paused') resumeButton.focus({ preventScroll: true });
     else if (contextFocus?.isConnected) contextFocus.focus({ preventScroll: true });
-    setAudioPaused(S.phase !== 'play');
+    setAudioPaused(S.phase === 'paused');
   });
   function pauseBattle() {
     if (S.phase !== 'play') return;
@@ -1052,4 +1052,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-          }
+                                            }
