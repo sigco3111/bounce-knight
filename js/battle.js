@@ -269,11 +269,13 @@ export async function startBattle(ctx) {
 
   // ---- fx: particle bursts ----
   const partGeo = new THREE.TetrahedronGeometry(0.12);
+  const iceGeo = new THREE.IcosahedronGeometry(0.5, 0); // 동결 감옥(공유)
+  const iceMat = new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.34, depthWrite: false });
   function burst(x, z, color, n = 8, spd = 3, y = 0.35, o = {}) {
     if (ctx.norender) return;
     const vy0 = o.vy0 ?? 2, vyR = o.vyR ?? 2.5, ttl0 = o.ttl0 ?? 0.55, ttlR = o.ttlR ?? 0.2, sc = o.sc ?? 1;
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color, transparent: true }));
+      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color, transparent: true, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: !o.add }));
       const a = Math.random() * Math.PI * 2, s = spd * (0.5 + Math.random() * 0.8);
       m.position.set(x, y, z);
       scene.add(m);
@@ -345,14 +347,16 @@ export async function startBattle(ctx) {
     el.classList.remove('hidden');
     document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
   }
+  function rmvEnemy(e) { scene.remove(e.obj); if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; } labels.remove(e.label); }
   function killEnemy(e, kc = 0xffd76a) { // 처치 파편은 죽인 공 타입 색(기본 금색): 처치 주체가 색으로 읽힘
     S.enemies = S.enemies.filter(x => x !== e);
-    scene.remove(e.obj); labels.remove(e.label);
+    rmvEnemy(e);
     S.kills++;
     if (e.type === 'boss') updBossBar();
     const bsc = e.type === 'boss' ? 1.7 : 1;
     burst(e.x, e.z, kc, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
     burst(e.x, e.z, 0xfff6dd, e.type === 'boss' ? 8 : 5, 2.5, 0.9, { sc: bsc });
+    ring(e.x, e.z, kc, e.type === 'boss' ? 2.3 : 1.25, 0.5); // 처치 고리: 죽인 공 타입 색이 바닥으로 퍼져 처치 주체가 읽힘
     S.shake = Math.max(S.shake || 0, 0.09);
     S.combo = (S.now - S.comboT <= 4) ? S.combo + 1 : 1; // kill streak within 4s
     S.comboT = S.now;
@@ -637,8 +641,27 @@ export async function startBattle(ctx) {
         const tint = e.frozen > 0 ? 0x2a6a9f : e.poison ? 0x54c22e : 0; // 중독은 어두운 장면에서도 읽히게 밝은 연두
         for (const mt of e.mats || []) { if (mt.emissive) { mt.emissive.setHex(tint || mt.userData._e); mt.emissiveIntensity = tint ? (e.poison && !e.frozen ? 0.85 : 0.6) : mt.userData._ei; } }
       }
-      if (e.type === 'boss' && !ctx.norender) { // 보스 맥동+위협 고리: 살아있는 동안 위압감 표시
-        e.obj.scale.setScalar(e.def.s * (1 + 0.06 * Math.sin(S.now * 4)));
+      if (!ctx.norender) { // 타격 반응(크기 펀치)과 상태 본체 표시: 보스 맥동과 합성해 한 번에 적용
+        const punch = e.flash > 0 ? e.flash / 0.14 : 0;
+        const pulse = e.type === 'boss' ? 1 + 0.06 * Math.sin(S.now * 4) : 1;
+        e.obj.scale.setScalar(e.def.s * pulse * (1 + 0.14 * punch));
+        if (e.frozen > 0 && !e.iceBox) { // 동결: 반투명 얼음 감옥 — '멈춤' 상태가 색만이 아니라 형태로도 읽힘
+          e.iceBox = new THREE.Mesh(iceGeo, iceMat);
+          e.iceBox.scale.set(e.def.s * 1.15, Math.max(e.h, 0.6) * 1.2, e.def.s * 1.15);
+          scene.add(e.iceBox);
+        }
+        if (e.frozen <= 0 && e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; }
+        if (e.iceBox) { e.iceBox.position.set(e.x, Math.max(e.h, 0.6) * 0.5, e.z); e.iceBox.rotation.y += dt * 0.7; }
+        if (e.poison && e.frozen <= 0) { // 중독: 몸에서 부글부글 올라가는 밝은 기포 — 녹색 틴트 위에서도 움직임으로 읽힘
+          e.bubT = (e.bubT || 0) - dt;
+          if (e.bubT <= 0) {
+            e.bubT = 0.32;
+            burst(e.x, e.z + 0.42, 0xd6ffb0, 3, 0.5, Math.max(e.h, 0.6) * 0.25, { vy0: 2.0, vyR: 0.9, ttl0: 0.7, ttlR: 0.2, sc: 1.25, add: true }); // 카메라 쪽으로 띄워 본체에 가려지지 않게
+            burst(e.x, e.z + 0.42, 0x7ddc3f, 2, 0.6, Math.max(e.h, 0.6) * 0.25, { vy0: 1.7, vyR: 0.9, ttl0: 0.75, ttlR: 0.2, sc: 1.0 });
+          }
+        }
+      }
+      if (e.type === 'boss' && !ctx.norender) { // 보스 위협 고리
         e.auraT = (e.auraT || 0) - dt; if (e.auraT <= 0) { e.auraT = 0.55; ring(e.x, e.z, 0xff3b30, 1.6, 0.55); }
       }
       if (e.poison) { // 중독 지속 피해
@@ -663,14 +686,14 @@ export async function startBattle(ctx) {
       e.obj.position.z = e.z;
       if (e.z >= DANGER_Z) {
         S.enemies = S.enemies.filter(x => x !== e);
-        scene.remove(e.obj); labels.remove(e.label);
+        rmvEnemy(e);
         hurtHero(e.type === 'boss' ? 3 : e.type === 'warrior' ? 2 : 1, e.x, DANGER_Z);
         if (S.over) return;
       }
       // 영웅 접촉
       if (Math.hypot(e.x - S.heroX, e.z - S.heroZ) < 0.55) {
         S.enemies = S.enemies.filter(x => x !== e);
-        scene.remove(e.obj); labels.remove(e.label);
+        rmvEnemy(e);
         hurtHero(1, e.x, e.z);
         if (S.over) return;
       }
@@ -776,4 +799,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                                                     }
+}
