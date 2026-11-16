@@ -907,8 +907,9 @@ export async function startBattle(ctx) {
         if (e.type === 'boss') continue;
         const p = proj(new THREE.Vector3(e.x, e.h + 0.55, e.z));
         let px = Math.max(20, Math.min(W() - 20, p.x)), py = Math.max(labelTop, p.y - 22);
-        while (placed.some(q => Math.abs(q.x - px) < 40 && Math.abs(q.y - py) < 16)) py += 16;
-        placed.push({ x: px, y: py });
+        const lw = e.label.el.offsetWidth || 34, lh = e.label.el.offsetHeight || 21;
+        while (placed.some(q => Math.abs(q.x - px) < (q.w + lw) / 2 + 3 && py < q.y + q.h + 3 && py + lh + 3 > q.y)) py += lh + 3;
+        placed.push({ x: px, y: py, w: lw, h: lh });
         labels.place(e.label, px, py);
       }
     }
@@ -960,4 +961,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-                  }
+}
