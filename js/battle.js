@@ -17,7 +17,7 @@ const BALL_R = 0.2;
 const ENEMY_R = 0.42;
 const SPEED = 10;
 const FIRE_INTERVAL = 0.5;
-const TRAIL_N = 16;
+const TRAIL_N = 7;
 const SPAWN_INTERVAL = 6.5;
 const MARCH_SPEED = 0.32;  // 초당 전진
 
@@ -213,7 +213,7 @@ export async function startBattle(ctx) {
   }
 
   // ---- fx: particle bursts ----
-  const partGeo = new THREE.TetrahedronGeometry(0.09);
+  const partGeo = new THREE.TetrahedronGeometry(0.12);
   function burst(x, z, color, n = 8, spd = 3, y = 0.35) {
     if (ctx.norender) return;
     for (let i = 0; i < n; i++) {
@@ -238,7 +238,8 @@ export async function startBattle(ctx) {
     if (!ctx.norender) {
       const tg = new THREE.BufferGeometry();
       tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
-      trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+      tg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
+      trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending, depthWrite: false }));
       trail.frustumCulled = false;
       scene.add(trail);
     }
@@ -254,7 +255,7 @@ export async function startBattle(ctx) {
     if (src.def.evolved) { S.evolvedHits++; S.lastEvolvedDmg = dmg; }
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.35, e.z)); popup(labelsC, p.x, p.y, '-' + dmg); }
     blip(220 + Math.random() * 60, 0.04, 'square', 0.025);
-    burst(e.x, e.z, BALL_TYPES[src.def.type].color, src.def.evolved ? 12 : 7, src.def.evolved ? 4.2 : 3, Math.max(0.4, (e.h || 1) * 0.6));
+    burst(e.x, e.z, BALL_TYPES[src.def.type].color, src.def.evolved ? 14 : 9, src.def.evolved ? 4.6 : 3.4, Math.max(0.4, (e.h || 1) * 0.6));
     if (src.def.type === 'fire') {
       const rad = src.def.evolved ? 1.4 : 0.95, sd = Math.max(1, Math.ceil(dmg / 2));
       for (const o of S.enemies) if (o !== e && Math.hypot(o.x - e.x, o.z - e.z) < rad) { o.hp -= sd; updEnemyLabel(o); }
@@ -314,7 +315,7 @@ export async function startBattle(ctx) {
     const owned = S.inventory.filter(b => !b.evolved);
     if (owned.length) { const b = owned[Math.floor(Math.random() * owned.length)]; pool.push({ kind: 'up', ball: b }); }
     pool.push({ kind: 'mul' });
-    if (S.fireMul > 0.6) pool.push({ kind: 'haste' });
+    if (S.fireMul > 0.7) pool.push({ kind: 'haste' });
     if (S.heroHP < 5) pool.push({ kind: 'life' });
     const pair = fusiblePairs();
     if (pair) pool.push({ kind: 'fuse', pair });
@@ -332,7 +333,7 @@ export async function startBattle(ctx) {
       if (c.kind === 'new') { ic = BALL_TYPES[c.type].css; t1 = '새 공: ' + BALL_TYPES[c.type].name; t2 = BALL_TYPES[c.type].desc; }
       else if (c.kind === 'up') { ic = BALL_TYPES[c.ball.type].css; t1 = '강화: ' + ballName(c.ball) + ' → Lv.' + (c.ball.lv + 1); t2 = '피해량이 오른다.'; }
       else if (c.kind === 'mul') { ic = '#8f7bff'; t1 = '패시브: 공격 태세'; t2 = '모든 공 피해량 +20%'; }
-      else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = '발사 주기 -15%'; }
+      else if (c.kind === 'haste') { ic = '#4dd2ff'; t1 = '패시브: 신속 사격'; t2 = '발사 주기 -15% (최대 3회 중첩)'; }
       else if (c.kind === 'life') { ic = '#ff7a9d'; t1 = '패시브: 수호 심장'; t2 = 'HP를 1 회복한다 (최대 5).'; }
       else { ic = 'linear-gradient(135deg,#ff6a2a,#ffe14d)'; t1 = '융합: ' + ballName(c.pair[0]) + ' × 2 → ' + EVOLVED[c.pair[0].type].name + ' Lv.' + c.pair[0].lv; t2 = '두 공을 합쳐 상위 공으로 진화시킨다.'; }
       const d = document.createElement('div');
@@ -515,9 +516,14 @@ export async function startBattle(ctx) {
       if (b.trail) {
         b.trailPts.unshift([b.x, 0.3, b.z]);
         if (b.trailPts.length > TRAIL_N) b.trailPts.pop();
-        const pa = b.trail.geometry.attributes.position, nn = b.trailPts.length;
-        for (let i = 0; i < TRAIL_N; i++) { const q = b.trailPts[Math.min(i, nn - 1)]; pa.setXYZ(i, q[0], q[1], q[2]); }
-        pa.needsUpdate = true;
+        const pa = b.trail.geometry.attributes.position, ca = b.trail.geometry.attributes.color, nn = b.trailPts.length;
+        const cr = ((BALL_TYPES[b.def.type].color >> 16) & 255) / 255, cg = ((BALL_TYPES[b.def.type].color >> 8) & 255) / 255, cb = (BALL_TYPES[b.def.type].color & 255) / 255;
+        for (let i = 0; i < TRAIL_N; i++) {
+          const q = b.trailPts[Math.min(i, nn - 1)];
+          const k = 1 - i / (TRAIL_N - 1), kk = k * k;
+          pa.setXYZ(i, q[0], q[1], q[2]); ca.setXYZ(i, cr * kk, cg * kk, cb * kk);
+        }
+        pa.needsUpdate = true; ca.needsUpdate = true;
         b.trail.geometry.setDrawRange(0, Math.max(2, nn));
       }
       if (b.z > RETURN_Z && b.vz > 0) {
