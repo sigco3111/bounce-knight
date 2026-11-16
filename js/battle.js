@@ -275,6 +275,7 @@ export async function startBattle(ctx) {
       const crown = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.07, 6, 8), new THREE.MeshStandardMaterial({ color: 0xffd479, emissive: 0xd7842b, emissiveIntensity: 0.6 }));
       crown.material.userData._e = 0xd7842b; crown.material.userData._ei = 0.6; mats.push(crown.material); crown.userData.personalGeometry = true; crown.rotation.x = Math.PI / 2; crown.position.y = m.h / def.s + 0.05; m.obj.add(crown);
     }
+    let enemyMarker = null;
     const guide = ENEMY_GUIDE.find(g => g.id === type);
     if (guide) {
       const mat = new THREE.MeshBasicMaterial({ color: guide.color, transparent: true, opacity: 0.82, depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide });
@@ -285,10 +286,10 @@ export async function startBattle(ctx) {
         marker = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.65, 0.1), mat); marker.position.set(0, m.h / def.s + 0.28, 0);
         const arm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.16, 0.1), mat); arm.userData.personalGeometry = true; marker.add(arm);
       } else { marker = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.12, 6, 16), mat); marker.position.set(0, m.h / def.s + 0.25, 0.3); }
-      marker.renderOrder = 2; marker.userData.personalGeometry = true; m.obj.add(marker);
+      marker.renderOrder = 2; marker.userData.personalGeometry = true; m.obj.add(marker); enemyMarker = marker;
     }
     const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2) * S.riskMul * route.hp);
-    const e = { originX: x, id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
+    const e = { originX: x, id: S.nextId++, type, def, enemyMarker, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
     if (S.over) { rmvEnemy(e); return null; }
     S.enemies.push(e); renderDirty = true; // async model completion may land while a dialog holds the view
@@ -296,7 +297,7 @@ export async function startBattle(ctx) {
   }
   function updEnemyLabel(e) {
     e.label.el.classList.toggle('hidden', e.type === 'boss'); // 보스 HP는 상단 전용 바에서만 표시
-    const role = { minion: '', rogue: '회피 이동', mage: '지면 시전', warrior: '중장갑', shield: '방패병 · 정면 방어', healer: '치유 사제', volatile: '폭발 운반병', boss: '' }[e.type];
+    const role = { minion: '', rogue: '회피 이동', mage: '지면 시전', warrior: '중장갑', shield: e.guardOpen ? '방패병 · 빈틈!' : '방패병 · 방어 중', healer: '치유 사제', volatile: '폭발 운반병', boss: '' }[e.type];
     e.label.el.innerHTML = `${role ? '<div style="font-size:8px;line-height:10px;color:#d4dcec">' + role + '</div>' : ''}<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
   function milestone(w, boss = false) { // wave-clear reward, real gold + heal, not just UI
@@ -433,6 +434,15 @@ export async function startBattle(ctx) {
     scene.remove(e.warning); e.warning.material.dispose(); e.warning = null;
   }
   function updateEnemyTactic(e, dt) {
+    if (e.type === 'shield') {
+      e.guardClock = ((e.guardClock || 0) + dt) % 3.5;
+      const open = e.guardClock >= 2;
+      if (!!e.guardOpen !== open) {
+        e.guardOpen = open; updEnemyLabel(e);
+        if (e.enemyMarker) { e.enemyMarker.material.opacity = open ? 0.16 : 0.82; e.enemyMarker.rotation.x = open ? Math.PI / 2 : 0; }
+      }
+      return 1;
+    }
     if (e.type === 'healer') {
       e.healTimer = (e.healTimer ?? 4) - dt;
       if (e.healTimer <= 0) {
@@ -1482,4 +1492,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-  }
+         }
