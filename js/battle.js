@@ -253,7 +253,7 @@ export async function startBattle(ctx) {
   }
   function ring(x, z, color, maxR = 1.1, ttl = 0.4) { // local impact ring at the hit point
     if (ctx.norender) return;
-    const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color, toneMapped: false, fog: false, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.12, z);
     m.scale.setScalar(0.01); // 첫 프레임도 작은 반경으로 시작해 다음 프레임 수축 깜박임을 막음
@@ -270,7 +270,7 @@ export async function startBattle(ctx) {
     if (ctx.norender) return;
     const col = BALL_TYPES[type].color;
     for (const sgn of [-1, 1]) for (let i = 0; i < 6; i++) { // 두 공이 하나로 모이는 수렴 파편
-      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: col, toneMapped: false, fog: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.position.set(x + sgn * (1.5 + i * 0.18), 0.4, z - (i % 3) * 0.35);
       scene.add(m);
       S.parts.push({ mesh: m, vx: -sgn * 4.5, vy: 0.8, vz: 0.4 * ((i % 3) - 1), ttl: 0.42, t: 0, sc: 1.1 });
@@ -364,7 +364,7 @@ export async function startBattle(ctx) {
     if (ctx.norender) return;
     const vy0 = o.vy0 ?? 2, vyR = o.vyR ?? 2.5, ttl0 = o.ttl0 ?? 0.55, ttlR = o.ttlR ?? 0.2, sc = o.sc ?? 1;
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color, transparent: true, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: !o.add }));
+      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color, toneMapped: false, fog: false, transparent: true, blending: o.add ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: !o.add }));
       const a = Math.random() * Math.PI * 2, s = spd * (0.5 + Math.random() * 0.8);
       m.position.set(x, y, z);
       scene.add(m);
@@ -967,4 +967,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+  }
