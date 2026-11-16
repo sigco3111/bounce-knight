@@ -47,9 +47,11 @@ async function showBase() {
   if (auto) document.getElementById('btn-sortie').click();
 }
 async function showBattle() {
+  if (current === 'battle') return; // 빠른 연타/중복 호출도 한 전장만 생성
+  current = 'battle'; // 첫 await 전에 잠금
+  document.getElementById('btn-sortie').disabled = true;
   scrBase.classList.add('hidden');
   scrBattle.classList.remove('hidden');
-  current = 'battle';
   // reset battle screen DOM (labels/hud) by reloading page state instead of cloning: simplest is location-based; here we just clear labels
   document.getElementById('bt-labels').innerHTML = '';
   document.getElementById('ov-over').classList.add('hidden');
