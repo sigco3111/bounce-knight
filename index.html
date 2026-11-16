@@ -116,6 +116,13 @@
   .btn:active { transform:translateY(2px); box-shadow:0 2px 0 #7c2a18; }
   .btn.sub { background:#2a3550; box-shadow:0 4px 0 #141b2c; font-size:14px; padding:11px 20px; }
 
+  #btn-knight { flex-shrink:0;min-height:32px;padding:5px 7px;border:1px solid #66789c;border-radius:7px;background:#273349;color:#eee4cd;font:700 10px sans-serif;cursor:pointer; }
+  #screen-base .res-bar { gap:8px;padding:0 10px; }
+  #ov-knights { z-index:20;padding:20px;box-sizing:border-box;overflow-y:auto;gap:12px;background:#080e1cf5; }
+  #ov-knights .cards { width:100%;max-width:440px; }
+  #ov-knights button:disabled { opacity:.45;cursor:default; }
+  #ov-knights button[aria-pressed=true] { outline:1px solid #e7ab59; }
+  @media (min-aspect-ratio:6/5) { #ov-knights { justify-content:flex-start;padding:16px; } #ov-knights .cards { max-width:780px;display:grid;grid-template-columns:repeat(3,1fr); } }
   #region-select { position:absolute;top:96px;left:12px;right:12px;z-index:7;text-align:center;background:#101524e8;border-radius:10px;padding:6px;box-sizing:border-box; }
   #region-options { display:flex;gap:5px; }
   #region-options button { flex:1;min-width:0;font:700 10px sans-serif;padding:8px 2px;color:#cbd7ed;background:#273349;border:1px solid #495870;border-radius:7px;cursor:pointer; }
@@ -168,7 +175,12 @@
   <div class="res-bar">
     <span class="chip">🪙 <span id="base-gold">0</span></span>
     <span class="chip">🏆 최고 웨이브 <span id="base-best">0</span></span>
-    <span class="gap"></span>
+    <span class="gap"></span><button id="btn-knight" type="button" aria-haspopup="dialog">기사</button>
+  </div>
+  <div id="ov-knights" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="knights-title">
+    <div class="ttl" id="knights-title">출격 기사 선택</div>
+    <div class="cards" id="knight-cards"></div>
+    <button id="btn-knight-close" class="btn sub" type="button">닫기</button>
   </div>
   <div class="title-base">전진 기지</div>
   <div id="base-labels"></div>
