@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { REGIONS, regionOpen, regionClear, validRegionProgress } from '../js/content.js';
+import { REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice } from '../js/content.js';
 
 const root = new URL('../', import.meta.url);
 const battle = fs.readFileSync(new URL('js/battle.js', root), 'utf8');
@@ -346,3 +346,23 @@ assert.deepEqual(regionClear({clearedRegions:['dungeon']},'ruins'),['dungeon','r
 assert.deepEqual(regionClear({clearedRegions:['dungeon']},'dungeon'),['dungeon']);
 assert.ok(!saveBox.qa.validSave({...valid,clearedRegions:['bad']}));
 console.log('PASS: optional region progress preserves old saves, validates IDs and unlocks next region only after a clear.');
+
+// Event previews and effects use the same pure rules as the live choice UI.
+const eventState = () => ({ heroHP: 2, gold: 0, dmgMul: 1, riskMul: 1, inventory: [ball('iron')] });
+for (const kind of ['treasure', 'curse', 'crossroad']) {
+  const st = eventState(), before = JSON.stringify(st), choices = eventChoices(kind, st, 3);
+  assert.equal(choices.length, 2); assert.equal(JSON.stringify(st), before);
+  assert.equal(new Set(choices.map(c => c.id)).size, 2);
+}
+let es = eventState();
+assert.ok(applyEventChoice(es, eventChoices('treasure', es, 3)[1], 3));
+assert.equal(es.gold, 45); assert.equal(es.riskMul, 1.2);
+es = eventState(); assert.ok(applyEventChoice(es, eventChoices('curse', es, 3)[1], 3));
+assert.equal(es.heroHP, 1); assert.equal(es.dmgMul, 1.4);
+const lowChoice = eventChoices('curse', es, 3)[1], lowBefore = JSON.stringify(es);
+assert.ok(lowChoice.disabled); assert.equal(applyEventChoice(es, lowChoice, 3), false); assert.equal(JSON.stringify(es), lowBefore);
+es = eventState(); applyEventChoice(es, eventChoices('crossroad', es, 3)[0], 3); assert.equal(es.heroHP, 3);
+es = eventState(); applyEventChoice(es, eventChoices('crossroad', es, 3)[1], 3); assert.equal(es.inventory[0].lv, 2);
+es.heroHP = 5; applyEventChoice(es, eventChoices('crossroad', es, 3)[0], 3); assert.equal(es.heroHP, 5);
+es.inventory = []; assert.ok(eventChoices('crossroad', es, 3)[1].disabled);
+console.log('PASS: event previews are read-only; treasure risk, nonlethal curse, capped recovery and first-ball upgrade match outcomes.');
