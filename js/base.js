@@ -17,6 +17,7 @@ export async function startBase(ctx) {
 
   const CW = () => W() / H() > 1.2 ? Math.round(W() * 0.56) : W();
   let reflowLabels = () => {};
+  let needsRender = true;
   let renderer;
   try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
   catch (_) { const error = new Error('3D graphics initialization failed'); error.code = 'GRAPHICS_INIT_FAILED'; throw error; }
@@ -25,12 +26,13 @@ export async function startBase(ctx) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.3;
   scr.prepend(renderer.domElement);
+  renderer.domElement.addEventListener('webglcontextrestored', () => { needsRender = true; });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0f1c);
   scene.fog = new THREE.Fog(0x0a0f1c, 10, 26);
   const camera = new THREE.PerspectiveCamera(40, CW() / H(), 0.1, 80);
-  const resize = () => { renderer.setSize(CW(), H()); camera.aspect = CW() / H(); camera.updateProjectionMatrix(); reflowLabels(); };
+  const resize = () => { renderer.setSize(CW(), H()); camera.aspect = CW() / H(); camera.updateProjectionMatrix(); needsRender = true; reflowLabels(); };
   window.addEventListener('resize', resize);
   camera.position.set(0, 10.8, 13.6);
   camera.lookAt(0, 0, -0.4);
@@ -158,7 +160,7 @@ export async function startBase(ctx) {
       ball.geometry.dispose(); ball.material.dispose();
       return;
     }
-    renderer.render(scene, camera);
+    if (needsRender) { renderer.render(scene, camera); needsRender = false; } // the base scene has no moving objects
     requestAnimationFrame(loop);
   })();
 }
