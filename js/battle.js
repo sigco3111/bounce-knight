@@ -35,12 +35,13 @@ function doubleSide(root) {
 
 export async function startBattle(ctx) {
   const W = () => window.innerWidth, H = () => window.innerHeight;
+  const VH = () => (W() / H() > 1.2 ? Math.round(H() * 0.68) : H()); // 짧은 가로: 캔버스를 하단 HUD 위 높이로 제한
   const scr = document.getElementById('screen-battle');
   const labelsC = document.getElementById('bt-labels');
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  renderer.setSize(W(), H());
+  renderer.setSize(W(), VH());
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.45;
   scr.prepend(renderer.domElement);
@@ -52,18 +53,13 @@ export async function startBattle(ctx) {
   scene.fog = new THREE.Fog(0x0b0f16, 10, 26);
 
   const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 80);
-  let camCk = 1;
-  function frameCamera() { // 짧은 가로 화면: 렌더 창을 아래로 잘라 영웅 줄이 하단 HUD 위에 오게(장면 자체는 그대로)
-    const a = W() / H();
-    camera.aspect = a;
-    if (a > 1.2) { const pad = Math.round(H() * 0.26); camera.setViewOffset(W(), H() + pad, 0, pad, W(), H()); }
-    else camera.clearViewOffset();
-    camCk = a > 1.2 ? 1.08 : 1; // 안개 범위 안에서 살짝 물러나 상단 시야 확보
-    camera.position.set(0, 12.9 * camCk, 12.2 * camCk);
+  function frameCamera() {
+    camera.aspect = W() / VH(); camera.updateProjectionMatrix();
+    camera.position.set(0, 12.9, 12.2);
     camera.lookAt(0, 0, -1.7);
     camera.updateMatrixWorld(true);
   }
-  window.addEventListener('resize', () => { renderer.setSize(W(), H()); frameCamera(); });
+  window.addEventListener('resize', () => { renderer.setSize(W(), VH()); frameCamera(); });
   frameCamera();
 
   scene.add(new THREE.AmbientLight(0x5d6d96, 1.4));
@@ -80,14 +76,14 @@ export async function startBattle(ctx) {
       fieldL: [-3.0, 0, 0], fieldR: [3.0, 0, 0], hero: [0, 0, 3.4],
     })) {
       const p = new THREE.Vector3(...v).project(camera);
-      pts[name] = [Math.round((p.x * 0.5 + 0.5) * W()), Math.round((-p.y * 0.5 + 0.5) * H())];
+      pts[name] = [Math.round((p.x * 0.5 + 0.5) * W()), Math.round((-p.y * 0.5 + 0.5) * VH())];
     }
     document.getElementById('state').dataset.proj = JSON.stringify({pts, iw: window.innerWidth, ih: window.innerHeight, dpr: window.devicePixelRatio, cw: canvas.clientWidth, ch: canvas.clientHeight});
   }
   const labels = new HtmlLabels(labelsC);
   const proj = v => {
     const p = v.clone().project(camera);
-    return { x: (p.x * 0.5 + 0.5) * W(), y: (-p.y * 0.5 + 0.5) * H() };
+    return { x: (p.x * 0.5 + 0.5) * W(), y: (-p.y * 0.5 + 0.5) * VH() };
   };
 
   // ---- static set ----
@@ -743,8 +739,8 @@ export async function startBattle(ctx) {
     if (S.shake > 0) {
       S.shake -= dt;
       const m = S.shake * 1.5;
-      camera.position.set((Math.random() - 0.5) * m, 12.9 * camCk + (Math.random() - 0.5) * m * 0.6, 12.2 * camCk);
-    } else if (S.shake !== 0) { S.shake = 0; camera.position.set(0, 12.9 * camCk, 12.2 * camCk); }
+      camera.position.set((Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
+    } else if (S.shake !== 0) { S.shake = 0; camera.position.set(0, 12.9, 12.2); }
     if (!ctx.norender) renderer.render(scene, camera);
     raf(loop);
   }
@@ -780,4 +776,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+                                                     }
