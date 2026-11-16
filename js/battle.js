@@ -170,7 +170,7 @@ export async function startBattle(ctx) {
     phase: 'play', wave: 0, kills: 0, gold: 0, xp: 0, level: 1,
     heroHP: ctx.heroMaxHP(), heroX: 0, heroZ: HERO_Z,
     inventory: [0, 1, 2].map(() => ({ type: 'iron', lv: 1, evolved: false })),
-    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [], parts: [], rings: [],
+    dmgMul: ctx.dmgMul(), fireMul: 1, balls: [], enemies: [], gems: [], parts: [], fxQueue: [], rings: [],
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
@@ -251,6 +251,7 @@ export async function startBattle(ctx) {
     setTimeout(() => blip(1174, 0.18, 'sine', 0.05), 120); // two-tone clear chime
     updHud();
   }
+  function delayFx(seconds, run) { S.fxQueue.push({ remaining: seconds, run }); }
   function ring(x, z, color, maxR = 1.1, ttl = 0.4) { // local impact ring at the hit point
     if (ctx.norender) return;
     const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), new THREE.MeshBasicMaterial({ color, toneMapped: false, fog: false, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -279,7 +280,7 @@ export async function startBattle(ctx) {
     burst(x, z, 0xffe27a, 18, 5, 0.4);
     burst(x, z, 0xffffff, 8, 2.8, 0.8, { add: true });
     ring(x, z, col, 1.7, 0.55);
-    setTimeout(() => ring(x, z, 0xffffff, 1.15, 0.45), 160); // 잔상 고리
+    delayFx(0.16, () => ring(x, z, 0xffffff, 1.15, 0.45)); // 잔상 고리
     fuseFlash.classList.remove('on'); void fuseFlash.offsetWidth; fuseFlash.classList.add('on');
   }
   function typeHitBurst(def, e) { // per-type hit fx so fire/ice/bolt/iron read differently
@@ -322,8 +323,8 @@ export async function startBattle(ctx) {
         burst(0, -6.9, 0xff3b30, 24, 5.5, 0.7, { sc: 1.6, vy0: 3, vyR: 3 });
         burst(0, -6.9, 0x3a1414, 10, 3, 0.5, { sc: 1.3, ttl0: 0.9, ttlR: 0.4 }); // dark smoke shards
         ring(0, -6.9, 0xff3b30, 2.4, 0.6);
-        setTimeout(() => ring(0, -6.9, 0xff3b30, 1.7, 0.55), 200); // 연속 충격파
-        setTimeout(() => ring(0, -6.9, 0xff3b30, 1.1, 0.5), 400);
+        delayFx(0.2, () => ring(0, -6.9, 0xff3b30, 1.7, 0.55)); // 연속 충격파
+        delayFx(0.4, () => ring(0, -6.9, 0xff3b30, 1.1, 0.5));
       }
       S.shake = Math.max(S.shake || 0, 0.5);
       blip(196, 0.4, 'sawtooth', 0.07);
@@ -474,8 +475,8 @@ export async function startBattle(ctx) {
     if (e.type === 'boss') { // 격파 클라이맥스: 연속 고리 + 검은 잔해 + 강한 흔들림 + 배너
       S.shake = Math.max(S.shake || 0, 0.25);
       if (!ctx.norender) {
-        setTimeout(() => ring(e.x, e.z, kc, 1.7, 0.5), 150);
-        setTimeout(() => ring(e.x, e.z, 0xffffff, 1.1, 0.4), 300);
+        delayFx(0.15, () => ring(e.x, e.z, kc, 1.7, 0.5));
+        delayFx(0.3, () => ring(e.x, e.z, 0xffffff, 1.1, 0.4));
         burst(e.x, e.z, 0x3a1414, 12, 3.4, 0.6, { sc: 1.4, ttl0: 0.9, ttlR: 0.4 });
       }
       milestone(S.wave, true); // boss gate: wave-clear reward lands when the boss actually falls
@@ -715,6 +716,10 @@ export async function startBattle(ctx) {
       if (loaded) { fireBall(loaded); S.fireTimer = FIRE_INTERVAL * S.fireMul; }
       else S.fireTimer = 0.12;
     }
+    // Delayed rings follow battle time, so choosing a card never advances them.
+    const dueFx = [];
+    S.fxQueue = S.fxQueue.filter(fx => { fx.remaining -= dt; if (fx.remaining > 0) return true; dueFx.push(fx); return false; });
+    for (const fx of dueFx) fx.run();
     // fx particles
     for (const p of [...S.parts]) {
       p.t += dt;
@@ -967,4 +972,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-  }
+      }
