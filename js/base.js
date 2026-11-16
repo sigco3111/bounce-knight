@@ -1,4 +1,4 @@
-import { REGIONS, regionOpen } from './content.js';
+import { REGIONS, regionOpen, KNIGHTS, knightOpen, selectedKnight } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, nextExpeditionPlan } from './common.js';
 
@@ -34,6 +34,34 @@ export async function startBase(ctx) {
   });
   chooseRegion(0);
   document.getElementById('btn-sortie').onclick = () => ctx.onSortie(selectedRegion);
+
+  const knightButton = document.getElementById('btn-knight'), knightDialog = document.getElementById('ov-knights');
+  const knightCards = document.getElementById('knight-cards');
+  function updateKnightButton() {
+    const k = selectedKnight(ctx.save); knightButton.textContent = k.short + ' 기사';
+    knightButton.setAttribute('aria-label', k.name + ' 선택됨. 출격 기사 변경');
+  }
+  function closeKnights() { knightDialog.classList.add('hidden'); knightButton.focus(); }
+  knightButton.onclick = () => {
+    knightCards.innerHTML = '';
+    for (const k of KNIGHTS) {
+      const b = document.createElement('button'), open = knightOpen(ctx.save, k);
+      b.className = 'card-pick'; b.type = 'button'; b.disabled = !open; b.dataset.knight = k.id;
+      b.setAttribute('aria-pressed', String(selectedKnight(ctx.save).id === k.id));
+      b.innerHTML = `<div><div class="t1">${open ? '' : '🔒 '}${k.name}${selectedKnight(ctx.save).id === k.id ? ' · 선택됨' : ''}</div><div class="t2">${k.desc}${open ? '' : '<br>' + REGIONS.find(r => r.id === k.unlock).name + ' 정복 후 해금'}</div></div>`;
+      b.onclick = () => { if (!knightOpen(ctx.save, k)) return; ctx.save.selectedKnight = k.id; ctx.persist(); updateKnightButton(); closeKnights(); };
+      knightCards.appendChild(b);
+    }
+    knightDialog.classList.remove('hidden'); knightCards.querySelector('button:not(:disabled)')?.focus();
+  };
+  document.getElementById('btn-knight-close').onclick = closeKnights;
+  knightDialog.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); closeKnights(); }
+    if (e.key !== 'Tab') return;
+    const buttons = [...knightDialog.querySelectorAll('button:not(:disabled)')], i = buttons.indexOf(document.activeElement);
+    e.preventDefault(); buttons[(i + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
+  });
+  updateKnightButton();
 
   const CW = () => W() / H() > 1.2 ? Math.round(W() * 0.56) : W();
   let reflowLabels = () => {};
