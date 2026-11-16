@@ -336,10 +336,13 @@ export async function startBattle(ctx) {
 
   // ---- gems ----
   const gemGeo = new THREE.OctahedronGeometry(0.16);
-  const gemMat = new THREE.MeshStandardMaterial({ color: 0x53e0ff, emissive: 0x53e0ff, emissiveIntensity: 1.6, roughness: 0.3 });
+  const gemMat = new THREE.MeshBasicMaterial({ color: 0x3fdbff, toneMapped: false, fog: false });
+  const gemHaloGeo = new THREE.RingGeometry(0.22, 0.29, 20);
+  const gemHaloMat = new THREE.MeshBasicMaterial({ color: 0x3fdbff, toneMapped: false, fog: false, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
   function dropGem(x, z) {
     const mesh = new THREE.Mesh(gemGeo, gemMat);
     mesh.position.set(x, 0.25, z);
+    if (!ctx.norender) { const halo = new THREE.Mesh(gemHaloGeo, gemHaloMat); halo.rotation.x = -Math.PI / 2; halo.position.y = -0.08; mesh.add(halo); }
     scene.add(mesh);
     S.gems.push({ mesh, x, z, ttl: 12 });
   }
@@ -596,6 +599,10 @@ export async function startBattle(ctx) {
     if (S.fireMul < 1) pb.push('연사x' + Math.round(Math.log(S.fireMul) / Math.log(0.85)));
     document.getElementById('bt-info').textContent = `처치 ${S.kills} · 🪙 ${S.gold}` + (S.combo >= 2 ? ` · 연속x${S.combo}` : '') + (pb.length ? ' · ' + pb.join(' · ') : '');
     document.getElementById('bt-xp').style.width = Math.min(100, S.xp / xpNeed() * 100) + '%';
+    const xpText = document.getElementById('bt-xp-text');
+    if (xpText) xpText.textContent = `경험치 ${S.xp}/${xpNeed()}`;
+    const xpBar = document.getElementById('bt-xp').parentElement;
+    xpBar.setAttribute('aria-valuenow', String(S.xp)); xpBar.setAttribute('aria-valuemax', String(xpNeed()));
     document.getElementById('bt-hearts').textContent = '♥'.repeat(Math.max(0, S.heroHP)) || '💀';
     document.getElementById('bt-balls').innerHTML = S.inventory.map(b =>
       `<span class="ball-chip"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}</span>`).join('');
@@ -832,6 +839,9 @@ export async function startBattle(ctx) {
     for (const g of [...S.gems]) {
       g.ttl -= dt;
       g.mesh.rotation.y += dt * 3;
+      // 시각 효과만: 수집 거리·보석 수명·경험치는 그대로 유지한다.
+      g.mesh.position.y = 0.25 + Math.sin(S.now * 4 + g.x * 2) * 0.045;
+      g.mesh.scale.setScalar((g.ttl < 2 ? 0.8 + Math.sin(g.ttl * 14) * 0.2 : 1) * (1 + Math.sin(S.now * 3) * 0.06));
       let d = Math.hypot(g.x - S.heroX, g.z - S.heroZ);
       if (d < 2.6 && d > 0.01) { // 자석: 가까우면 영웅에게 끌려옴
         const pull = 4.6 * dt;
@@ -841,6 +851,7 @@ export async function startBattle(ctx) {
       }
       if (d < 0.8) {
         S.xp++; S.gemsGot++;
+        ring(S.heroX, S.heroZ, 0x53e0ff, 0.55, 0.24);
         scene.remove(g.mesh); S.gems = S.gems.filter(x => x !== g);
         blip(990, 0.06, 'sine', 0.03);
         updHud();
@@ -934,4 +945,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-            }
+  }
