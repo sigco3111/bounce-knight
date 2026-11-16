@@ -649,6 +649,42 @@ export async function startBattle(ctx) {
       try { if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id); } catch (_) { /* 이미 해제된 포인터 */ }
     }
   }
+  // Mobile interruptions must not leave a live battle running unattended.
+  const pauseButton = document.createElement('button');
+  pauseButton.type = 'button'; pauseButton.id = 'btn-pause'; pauseButton.textContent = 'Ⅱ';
+  pauseButton.setAttribute('aria-label', '전투 일시정지');
+  pauseButton.style.cssText = 'position:absolute;right:12px;top:10px;width:38px;height:38px;border:1px solid #5e6b88;border-radius:10px;background:#1b2334;color:#ece6f8;font:700 20px sans-serif;z-index:10;cursor:pointer';
+  scr.appendChild(pauseButton);
+  topHud.style.paddingRight = '60px';
+  const pauseOverlay = document.createElement('div');
+  pauseOverlay.id = 'ov-pause'; pauseOverlay.className = 'overlay hidden';
+  pauseOverlay.setAttribute('role', 'dialog'); pauseOverlay.setAttribute('aria-modal', 'true'); pauseOverlay.setAttribute('aria-labelledby', 'pause-title');
+  pauseOverlay.style.boxSizing = 'border-box';
+  pauseOverlay.innerHTML = '<div class="ttl" id="pause-title">일시정지</div><div class="dsc" style="text-align:center;line-height:1.8">전투 시간이 멈췄습니다.<br>준비되면 이어서 플레이하세요.</div><button class="btn" type="button">계속하기</button>';
+  scr.appendChild(pauseOverlay);
+  const resumeButton = pauseOverlay.querySelector('button');
+  let pausedAnimations = [];
+  function pauseBattle() {
+    if (S.phase !== 'play') return;
+    S.phase = 'paused'; clearControls();
+    pausedAnimations = scr.getAnimations({ subtree: true }).filter(a => a.playState === 'running');
+    for (const a of pausedAnimations) a.pause();
+    pauseButton.disabled = true; pauseOverlay.classList.remove('hidden'); resumeButton.focus({ preventScroll: true });
+  }
+  function resumeBattle() {
+    if (S.phase !== 'paused') return;
+    pauseOverlay.classList.add('hidden'); pauseButton.disabled = false;
+    for (const a of pausedAnimations) if (a.playState === 'paused') a.play();
+    pausedAnimations = []; S.phase = 'play'; pauseButton.focus({ preventScroll: true });
+  }
+  pauseButton.onclick = pauseBattle; resumeButton.onclick = resumeBattle;
+  pauseOverlay.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); resumeButton.focus(); } });
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (S.phase === 'play') { e.preventDefault(); pauseBattle(); }
+    else if (S.phase === 'paused') { e.preventDefault(); resumeBattle(); }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseBattle(); });
   window.addEventListener('blur', clearControls); // 화면을 벗어나면 조작 잔류 방지
   let hintGone = false;
   canvas.addEventListener('pointerdown', e => {
@@ -896,11 +932,13 @@ export async function startBattle(ctx) {
     if (S.phase === 'play' && S.combo > 0 && S.now - S.comboT > 4) { S.combo = 0; updHud(); }
     for (let i = 0; i < sub; i++) step(dt);
     const followX = W() / H() > 1.2 ? 0 : S.heroX * 0.6; // 세로 화면 가장자리: 부분 수평 추적으로 무기까지 프레임 안에 유지
-    if (S.shake > 0) {
-      S.shake -= dt;
-      const m = S.shake * 1.5;
-      camera.position.set(followX + (Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
-    } else { S.shake = 0; camera.position.set(followX, 12.9, 12.2); }
+    if (S.phase === 'play') { // pause holds the camera too, not only combat state
+      if (S.shake > 0) {
+        S.shake -= dt;
+        const m = S.shake * 1.5;
+        camera.position.set(followX + (Math.random() - 0.5) * m, 12.9 + (Math.random() - 0.5) * m * 0.6, 12.2);
+      } else { S.shake = 0; camera.position.set(followX, 12.9, 12.2); }
+    }
     camera.updateMatrixWorld(true);
     if (!ctx.norender) { // 실제 전장 너비만 표시. 카메라 추적/흔들림 후 같은 좌표계로 투영
       const a = proj(new THREE.Vector3(-AX, 0.05, DANGER_Z));
@@ -972,4 +1010,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+                                                                                                 }
