@@ -1,4 +1,4 @@
-import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice, KNIGHTS } from './content.js';
+import { REGIONS, EXPEDITION_EVENTS, EVENT_NAMES, eventChoices, applyEventChoice, KNIGHTS, ROUTES, RELICS, relicOptions, CONTRACTS, contractProgress } from './content.js';
 import * as THREE from 'three';
 import { loadModel, HtmlLabels, popup, blip, isAudioMuted, setAudioMuted, setAudioPaused, BALL_TYPES, EVOLVED, BASE_ELEMENTS, crossFusion, ballHas, ballName, ballDmg, ballReaction, nextExpeditionPlan } from './common.js';
 
@@ -39,7 +39,7 @@ export async function startBattle(ctx) {
   // 적 모델을 전투 전에 준비: 진행 중 다운로드 실패로 보스가 누락되지 않게 한다.
   await Promise.all([...new Set(Object.values(ENEMY_DEFS).map(def => def.u))].map(url => loadModel(url, { poseT: false })));
   const region = ctx.region || REGIONS[0], regionIndex = REGIONS.indexOf(region);
-  const knight = ctx.knight || KNIGHTS[0], statusScale = knight.status;
+  const knight = ctx.knight || KNIGHTS[0], statusScale = knight.status, route = ctx.route || ROUTES[0], contract = ctx.contract || CONTRACTS[0];
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const panel = document.querySelector('#screen-battle > .panel');
@@ -216,7 +216,7 @@ export async function startBattle(ctx) {
     aimDir: 0, moveTarget: null, over: false, nextId: 1,
     fireTimer: 0.8, spawnTimer: 0.5, now: 0, fcount: 0,
     shots: 0, hits: 0, evolvedHits: 0, lastEvolvedDmg: 0, gemsGot: 0,
-    combo: 0, comboT: -99, shieldSpent: false, reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
+    combo: 0, comboT: -99, shieldSpent: false, relicWardSpent: false, relicKills: 0, relics: [], relicWaves: [], discoveries: [], reactions: 0, region: region.id, victory: false, eventsSeen: [], eventPending: null, riskMul: 1, hazardTimer: 8, hazard: null,
   };
   for (let i = 1; i < ctx.extraBalls(); i++) S.inventory.push({ type: 'iron', lv: 1, evolved: false });
   const xpNeed = () => 4 + S.level * 3;
@@ -272,7 +272,7 @@ export async function startBattle(ctx) {
       const crown = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.07, 6, 8), new THREE.MeshStandardMaterial({ color: 0xffd479, emissive: 0xd7842b, emissiveIntensity: 0.6 }));
       crown.material.userData._e = 0xd7842b; crown.material.userData._ei = 0.6; mats.push(crown.material); crown.userData.personalGeometry = true; crown.rotation.x = Math.PI / 2; crown.position.y = m.h / def.s + 0.05; m.obj.add(crown);
     }
-    const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2) * S.riskMul);
+    const hp = Math.round(def.hp(S.wave) * (1 + regionIndex * 0.2) * S.riskMul * route.hp);
     const e = { originX: x, id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
     if (S.over) { rmvEnemy(e); return null; }
@@ -310,7 +310,9 @@ export async function startBattle(ctx) {
     scene.add(m);
     S.rings.push({ mesh: m, t: 0, ttl, maxR });
   }
-  function bounceFx(b) { // 벽 튕김: 짧은 타입색 스파크 + 작은 고리 — 적 타격(본체 플래시+피해 수치+큰 고리)과 구분
+  const hasRelic = id => S.relics.includes(id);
+  function bounceFx(b) {
+    if (hasRelic('ricochet')) b.wallBonus = Math.min(3, (b.wallBonus || 0) + 1); // 벽 튕김: 짧은 타입색 스파크 + 작은 고리 — 적 타격(본체 플래시+피해 수치+큰 고리)과 구분
     const bc = BALL_TYPES[b.def.type].color;
     burst(b.x, b.z, bc, 5, 2.2, 0.3, { ttl0: 0.3, ttlR: 0.12, sc: 0.8 });
     ring(b.x, b.z, bc, 0.55, 0.26);
@@ -391,6 +393,7 @@ export async function startBattle(ctx) {
       else if (w >= 3 && r < 0.65) type = 'rogue';
       await spawnEnemy(type, x + (Math.random() - 0.5) * 0.4, -6.9 - Math.random() * 0.5);
     }
+    if (route.id === 'elite' && advance && [4,7].includes(w)) await spawnEnemy('warrior', 0, -7.1);
     updHud();
   }
 
@@ -640,6 +643,10 @@ export async function startBattle(ctx) {
     S.enemies = S.enemies.filter(x => x !== e);
     rmvEnemy(e);
     S.kills++;
+    if (hasRelic('vampire')) {
+      S.relicKills++;
+      if (S.relicKills % 5 === 0 && S.heroHP < ctx.heroMaxHP()) S.heroHP++;
+    }
     const bsc = e.type === 'boss' ? 1.7 : 1;
     burst(e.x, e.z, kc, e.type === 'boss' ? 20 : 12, 4.5, 0.55, { sc: bsc });
     burst(e.x, e.z, 0xfff6dd, e.type === 'boss' ? 8 : 5, 2.5, 0.9, { sc: bsc });
@@ -652,7 +659,7 @@ export async function startBattle(ctx) {
       blip(660 + S.combo * 22, 0.16, 'triangle', 0.05);
       ring(e.x, e.z, 0xffb347, 1.4, 0.45);
     }
-    const g = e.def.gold + Math.floor(S.wave / 2) + Math.floor(S.combo / 5); // combo pays real gold
+    const g = Math.round((e.def.gold + Math.floor(S.wave / 2) + Math.floor(S.combo / 5)) * route.gold) + (hasRelic('bounty') ? 2 : 0); // route multiplier before relic bonus
     S.gold += g;
     dropGem(e.x + (Math.random() - 0.5) * 0.3, e.z);
     if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.7, e.z)); popup(labelsC, p.x, p.y, '+' + g, 'gold'); }
@@ -671,6 +678,11 @@ export async function startBattle(ctx) {
   }
 
   function hurtHero(dmg, ex, ez) {
+    if (hasRelic('ward') && !S.relicWardSpent) {
+      S.relicWardSpent = true; dmg = Math.max(0, dmg - 1);
+      if (!ctx.norender) popup(labelsC, W() / 2, VH() * 0.65, '호박 부적 · 피해 1 방어', 'banner');
+      if (!dmg) { updHud(); return; }
+    }
     if (knight.id === 'guardian' && !S.shieldSpent) {
       S.shieldSpent = true; dmg = Math.max(0, dmg - 1);
       if (!ctx.norender) popup(labelsC, W() / 2, VH() * 0.6, '수호 방패 · 피해 1 방어', 'banner');
@@ -685,6 +697,53 @@ export async function startBattle(ctx) {
     setTimeout(() => blip(90, 0.22, 'sawtooth', 0.045, 1), 70);
     updHud();
     if (S.heroHP <= 0) gameOver();
+  }
+
+  // ---- discoveries: three random unseen-in-hand relics, max two active ----
+  const relicOverlay = document.getElementById('ov-relic'), relicCards = document.getElementById('relic-cards');
+  function closeRelic() {
+    if (S.phase !== 'relic') return;
+    S.phase = 'play'; S.pendingRelic = null; scr.classList.remove('choice-dialog-open'); relicOverlay.classList.add('hidden'); updHud();
+  }
+  document.getElementById('btn-relic-skip').onclick = closeRelic;
+  relicOverlay.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || S.phase !== 'relic') return;
+    const buttons = [...relicOverlay.querySelectorAll('button')], i = buttons.indexOf(document.activeElement);
+    e.preventDefault(); buttons[(i + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus();
+  });
+  function takeRelic(relic, slot = null) {
+    if (S.phase !== 'relic' || S.relics.includes(relic.id)) return;
+    if (S.relics.length >= 2 && slot === null) {
+      S.pendingRelic = relic.id; relicCards.innerHTML = '';
+      document.getElementById('relic-title').textContent = '교체할 유물을 고르세요';
+      document.getElementById('relic-desc').textContent = relic.name + ' 획득. 기존 유물 하나를 교체합니다.';
+      S.relics.forEach((id, i) => {
+        const old = RELICS.find(r => r.id === id), b = document.createElement('button'); b.type = 'button'; b.className = 'card-pick'; b.dataset.replace = String(i);
+        b.innerHTML = `<div><div class="t1">${old.name} 교체</div><div class="t2">잃는 효과: ${old.desc}</div></div>`;
+        b.onclick = () => { if (S.pendingRelic === relic.id) takeRelic(relic, i); }; relicCards.appendChild(b);
+      });
+      relicCards.querySelector('button')?.focus();
+      if (ctx.auto) setTimeout(() => relicCards.querySelector('button')?.click(), 200);
+      return;
+    }
+    if (slot !== null) S.relics[slot] = relic.id; else S.relics.push(relic.id);
+    if (!S.discoveries.includes(relic.id)) S.discoveries.push(relic.id);
+    closeRelic(); blip(780, 0.14, 'sine', 0.04);
+  }
+  function openRelic(wave) {
+    if (![4,7,9].includes(wave) || S.relicWaves.includes(wave) || S.phase !== 'play') return false;
+    S.relicWaves.push(wave); S.phase = 'relic'; clearControls(); scr.classList.add('choice-dialog-open');
+    document.getElementById('relic-title').textContent = '잊힌 유물 발견';
+    document.getElementById('relic-desc').textContent = `${wave}웨이브 진입 전 · 보유 ${S.relics.length}/2 · 하나를 고르거나 지나가세요`;
+    relicCards.innerHTML = '';
+    for (const r of relicOptions(S.relics)) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'card-pick'; b.dataset.relic = r.id;
+      b.innerHTML = `<div><div class="t1">${r.name}</div><div class="t2">${r.desc}</div></div>`;
+      b.onclick = () => { if (!S.pendingRelic) takeRelic(r); }; relicCards.appendChild(b);
+    }
+    relicOverlay.classList.remove('hidden'); relicCards.querySelector('button')?.focus();
+    if (ctx.auto) setTimeout(() => relicCards.querySelector('button')?.click(), 200);
+    return true;
   }
 
   // ---- expedition choices: combat holds until one explicit choice ----
@@ -830,12 +889,13 @@ export async function startBattle(ctx) {
   });
   function gameOver() {
     if (S.over) return;
+    S.contractResult = contractProgress(contract, S); S.gold += S.contractResult.reward;
     S.over = true; S.phase = 'over'; clearControls(); clearRegionHazard();
     for (const e of S.enemies) clearEnemyWarning(e);
     document.getElementById('over-ttl').textContent = S.victory ? `${region.name} 정복!` : '원정 종료';
     blip(200, 0.3, 'sawtooth', 0.055, 1);
     setTimeout(() => blip(130, 0.45, 'sawtooth', 0.05, 1), 170);
-    document.getElementById('over-dsc').textContent = `${region.name} ${S.wave}/10 · 처치 ${S.kills} · 획득 🪙 ${S.gold}`;
+    document.getElementById('over-dsc').textContent = `${region.name} ${S.wave}/10 · 처치 ${S.kills} · 획득 🪙 ${S.gold}\n${contract.name}: ${S.contractResult.complete ? '달성 +' + S.contractResult.reward + '골드 (위 금액에 포함)' : '추가 보상 없음'} · 유물 발견 ${S.discoveries.length}종`;
     const plan = nextExpeditionPlan({ ...ctx.save, bestWave: Math.max(ctx.save.bestWave, S.wave) }, S.gold);
     const temporary = ctx.isSessionOnly?.();
     document.getElementById('over-plan').textContent = temporary
@@ -846,7 +906,7 @@ export async function startBattle(ctx) {
     const finish = () => {
       if (S.phase === 'done') return; // 중복 클릭/자동 복귀가 원정 보상을 두 번 더하지 않게
       S.phase = 'done';
-      ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills, victory: S.victory, region: region.id });
+      ctx.onEnd({ gold: S.gold, wave: S.wave, kills: S.kills, victory: S.victory, region: region.id, discoveries: S.discoveries });
     };
     document.getElementById('btn-tobase').onclick = finish;
     if (ctx.auto) setTimeout(finish, 1500);
@@ -865,8 +925,11 @@ export async function startBattle(ctx) {
   });
   function updHud() {
     const bossAlive = S.enemies.some(e => e.type === 'boss');
+    document.getElementById('bt-relics').textContent = S.relics.length ? '유물 ' + S.relics.map(id => RELICS.find(r => r.id === id).name).join(' · ') : '유물 0/2 · 4/7/9웨이브 전 발견';
     document.getElementById('bt-wave').textContent = region.name + ' ' + Math.max(1, S.wave) + '/10' + (bossAlive ? ' · 보스' : '');
     const pb = [];
+    pb.push(route.name);
+    if (contract.goal) { const p = contractProgress(contract, S); pb.push(contract.name + ' ' + p.value + '/' + contract.goal); }
     pb.push(knight.short + (knight.id === 'guardian' && !S.shieldSpent ? ' · 방패' : ''));
     if (S.reactions) pb.push('연계 ' + S.reactions);
     if (S.dmgMul > 1) pb.push('공격+' + Math.round((S.dmgMul - 1) * 100) + '%');
@@ -1053,7 +1116,7 @@ export async function startBattle(ctx) {
     if (S.fireTimer <= 0) {
       const inFlight = new Set(S.balls.map(b => b.def));
       const loaded = S.inventory.find(b => !inFlight.has(b));
-      if (loaded) { fireBall(loaded); S.fireTimer = FIRE_INTERVAL * S.fireMul; }
+      if (loaded) { fireBall(loaded); S.fireTimer = FIRE_INTERVAL * S.fireMul * (hasRelic('haste') ? 0.85 : 1); }
       else S.fireTimer = 0.12;
     }
     // Delayed rings follow battle time, so choosing a card never advances them.
@@ -1106,7 +1169,7 @@ export async function startBattle(ctx) {
             b.x = e.x + nx * (rs + 0.01); b.z = e.z + nz * (rs + 0.01);
           }
           S.hits++;
-          const dmg = Math.max(1, Math.round(ballDmg(b.def) * S.dmgMul));
+          const dmg = Math.max(1, Math.round(ballDmg(b.def) * S.dmgMul) + (hasRelic('ricochet') ? (b.wallBonus || 0) : 0));
           damageEnemy(e, dmg, b);
           break;
         }
@@ -1193,7 +1256,7 @@ export async function startBattle(ctx) {
       const tacticSpeed = updateEnemyTactic(e, dt);
       if (S.over) return;
       if (e.mixer) e.mixer.update(dt * (e.type === 'boss' ? 0.4 : e.def.spd * 0.65) * tacticSpeed);
-      e.z += MARCH_SPEED * e.def.spd * dt * tacticSpeed;
+      e.z += MARCH_SPEED * e.def.spd * dt * tacticSpeed * (route.march || 1);
       if (!e.warned && e.z > 1.2) { // attack telegraph: enemy about to breach
         e.warned = true;
         if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.9, e.z)); popup(labelsC, p.x, p.y, '!', 'warn'); }
@@ -1221,6 +1284,7 @@ export async function startBattle(ctx) {
     S.spawnTimer -= dt;
     if (S.spawnTimer <= 0) {
       const nextWave = S.wave + 1;
+      if (openRelic(nextWave)) { S.spawnTimer = 0.1; return; }
       if (openExpeditionEvent(nextWave)) { S.spawnTimer = 0.1; return; }
       S.spawnTimer = SPAWN_INTERVAL;
       const bossAlive = S.enemies.some(e => e.type === 'boss');
@@ -1240,7 +1304,7 @@ export async function startBattle(ctx) {
         g.mesh.position.z = g.z;
       }
       let d = Math.hypot(g.x - S.heroX, g.z - S.heroZ);
-      if (d < 2.6 && d > 0.01) { // 자석: 가까우면 영웅에게 끌려옴
+      if (d < (hasRelic('magnet') ? 4.2 : 2.6) && d > 0.01) { // 자석: 가까우면 영웅에게 끌려옴
         const pull = 4.6 * dt;
         g.x += (S.heroX - g.x) / d * pull; g.z += (S.heroZ - g.z) / d * pull;
         g.mesh.position.set(g.x, 0.25, g.z);
@@ -1306,7 +1370,7 @@ export async function startBattle(ctx) {
     }
     S.fcount++;
     document.getElementById('state').textContent = JSON.stringify({
-      region: region.id, knight: knight.id, victory: S.victory, phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
+      region: region.id, knight: knight.id, route: route.id, contract: contract.id, relics: S.relics, victory: S.victory, phase: S.phase, wave: S.wave, kills: S.kills, gold: S.gold, heroHP: S.heroHP, combo: S.combo,
       enemies: S.enemies.length, balls: S.balls.length, gems: S.gems.length, gemsGot: S.gemsGot,
       heroX: Math.round(S.heroX * 100) / 100, heroZ: Math.round(S.heroZ * 100) / 100,
       t: Math.round(S.now * 10) / 10, hits: S.hits, shots: S.shots,
@@ -1355,4 +1419,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-}
+                        }
