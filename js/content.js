@@ -47,3 +47,39 @@ export const KNIGHTS = [
 export const knightOpen = (save, knight) => !knight.unlock || (save.clearedRegions || []).includes(knight.unlock);
 export const selectedKnight = save => KNIGHTS.find(k => k.id === save.selectedKnight && knightOpen(save, k)) || KNIGHTS[0];
 export const validKnight = value => value === undefined || KNIGHTS.some(k => k.id === value);
+
+export const ROUTES = [
+  { id: 'safe', name: '순찰로', desc: '기본 적과 보상 · 익숙한 원정', hp: 1, gold: 1 },
+  { id: 'elite', name: '정예 습격', desc: '적 HP +35% · 4/7웨이브 중장갑 증원 · 적 골드 +50%', hp: 1.35, gold: 1.5 },
+  { id: 'gilded', name: '황금 행렬', desc: '적 전진 +20% · 적 골드 2배', hp: 1, gold: 2, march: 1.2 },
+];
+export const selectedRoute = save => ROUTES.find(r => r.id === save.selectedRoute) || ROUTES[0];
+export const validRoute = value => value === undefined || ROUTES.some(r => r.id === value);
+
+export const RELICS = [
+  { id: 'magnet', name: '청록 나침반', desc: '젬 자석 거리 2.6 → 4.2. 실제 수집 거리는 그대로.' },
+  { id: 'ricochet', name: '메아리 인장', desc: '벽에 튕길 때마다 그 발사 공 직격 +1, 최대 +3. 회수하면 초기화.' },
+  { id: 'ward', name: '호박 부적', desc: '보유 중 다음 피격 피해 1 방어. 원정당 한 번만.' },
+  { id: 'haste', name: '시계 톱니', desc: '보유 중 발사 대기시간 15% 감소. 신속 사격과 별개.' },
+  { id: 'bounty', name: '탐욕 주머니', desc: '적 처치 골드 +2. 조건 배율 계산 뒤 더함.' },
+  { id: 'vampire', name: '진홍 성배', desc: '보유 중 적 5명 처치마다 HP +1. 성의 최대 HP까지.' },
+];
+export const validRelicProgress = value => value === undefined || (Array.isArray(value) && value.length <= RELICS.length && value.every(id => RELICS.some(r => r.id === id)) && new Set(value).size === value.length);
+export const mergeDiscoveries = (save, found) => [...new Set([...(save.discoveredRelics || []), ...found])].filter(id => RELICS.some(r => r.id === id));
+export function relicOptions(held, random = Math.random) {
+  const pool = RELICS.filter(r => !held.includes(r.id));
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [pool[i],pool[j]] = [pool[j],pool[i]]; }
+  return pool.slice(0, 3);
+}
+export const CONTRACTS = [
+  { id: 'none', name: '계약 없음', desc: '조건 보상 없이 자유롭게 원정', goal: 0, reward: 0 },
+  { id: 'slayer', name: '토벌 의뢰', desc: '이번 원정 적 10명 처치 · 골드 +35', goal: 10, reward: 35 },
+  { id: 'collector', name: '보석 회수', desc: '이번 원정 젬 10개 회수 · 골드 +40', goal: 10, reward: 40 },
+  { id: 'boss', name: '수문장 사냥', desc: '이번 지역 보스 처치 · 골드 +60', goal: 1, reward: 60 },
+];
+export const selectedContract = save => CONTRACTS.find(c => c.id === save.selectedContract) || CONTRACTS[0];
+export const validContract = value => value === undefined || CONTRACTS.some(c => c.id === value);
+export function contractProgress(contract, state) {
+  const value = contract.id === 'slayer' ? state.kills : contract.id === 'collector' ? state.gemsGot : contract.id === 'boss' ? Number(state.victory) : 0;
+  return { value: Math.min(contract.goal, value), complete: contract.goal > 0 && value >= contract.goal, reward: contract.goal > 0 && value >= contract.goal ? contract.reward : 0 };
+}
