@@ -580,9 +580,10 @@ export async function startBattle(ctx) {
     // balls
     for (const b of [...S.balls]) {
       b.x += b.vx * dt; b.z += b.vz * dt;
-      if (b.x < -AX + BALL_R) { b.x = -AX + BALL_R; b.vx = Math.abs(b.vx); burst(b.x, b.z, 0x9fd8ff, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
-      if (b.x > AX - BALL_R) { b.x = AX - BALL_R; b.vx = -Math.abs(b.vx); burst(b.x, b.z, 0x9fd8ff, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
-      if (b.z < BACK + BALL_R) { b.z = BACK + BALL_R; b.vz = Math.abs(b.vz); burst(b.x, b.z, 0x9fd8ff, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      const bc = BALL_TYPES[b.def.type].color; // 튕김 스파크도 공 타입 색을 따라가게 해 소속이 읽히게
+      if (b.x < -AX + BALL_R) { b.x = -AX + BALL_R; b.vx = Math.abs(b.vx); burst(b.x, b.z, bc, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      if (b.x > AX - BALL_R) { b.x = AX - BALL_R; b.vx = -Math.abs(b.vx); burst(b.x, b.z, bc, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
+      if (b.z < BACK + BALL_R) { b.z = BACK + BALL_R; b.vz = Math.abs(b.vz); burst(b.x, b.z, bc, 3, 1.6, 0.3); blip(470 + Math.random() * 70, 0.03, 'square', 0.011); }
       for (const e of S.enemies) {
         const dx = b.x - e.x, dz = b.z - e.z, d = Math.hypot(dx, dz), rs = BALL_R + ENEMY_R;
         if (d < rs) {
