@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice, KNIGHTS, knightOpen, selectedKnight, validKnight, validRoute, validContract, validRelicProgress, ROUTES, selectedRoute, RELICS, relicOptions, mergeDiscoveries, CONTRACTS, selectedContract, contractProgress } from '../js/content.js';
+import { ENEMY_GUIDE, specialEnemyAt, shieldDirect, REGIONS, regionOpen, regionClear, validRegionProgress, eventChoices, applyEventChoice, KNIGHTS, knightOpen, selectedKnight, validKnight, validRoute, validContract, validRelicProgress, ROUTES, selectedRoute, RELICS, relicOptions, mergeDiscoveries, CONTRACTS, selectedContract, contractProgress } from '../js/content.js';
 
 const root = new URL('../', import.meta.url);
 const battle = fs.readFileSync(new URL('js/battle.js', root), 'utf8');
@@ -291,7 +291,7 @@ const damageLogic = between(battle, '  function damageEnemy(', '  function updBo
 function reactHit(type, status) {
   const e = { hp: 100, mats: [], x: 0, z: 0, h: 1, ...status };
   const S = { enemies: [e], reactions: 0, evolvedHits: 0 };
-  const box = vm.createContext({ S, Math, statusScale:1, ctx: { norender: true }, ballReaction: reactionBox.react, ballHas: reactionBox.ballHasRule, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
+  const box = vm.createContext({ shieldDirect, S, Math, statusScale:1, ctx: { norender: true }, ballReaction: reactionBox.react, ballHas: reactionBox.ballHasRule, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
   vm.runInContext(damageLogic + '\nglobalThis.hit=damageEnemy;', box);
   const src = { def: ball(type) };
   box.hit(e, 1, src); const first = e.hp; box.hit(e, 1, src);
@@ -392,7 +392,7 @@ console.log('PASS: new ball evolution, four unordered cross recipes, lower-level
 {
   const enemy = (x,z) => ({hp:100,mats:[],x,z,h:1,obj:{position:{y:0,set(){}}}});
   const e=enemy(0,-2), o=enemy(1,-2), S={enemies:[e,o],reactions:0,evolvedHits:0};
-  const box=vm.createContext({S,Math,BACK:-8,statusScale:1,ctx:{norender:true},ballHas:rules.rules.ballHas,ballReaction:reactionBox.react,ballDmg:rules.rules.ballDmg,BALL_TYPES:rules.rules.BALL_TYPES,scene:{remove(){}},blip(){},ring(){},burst(){},typeHitBurst(){},updHud(){},updEnemyLabel(){},updBossBar(){},killEnemy(){}});
+  const box=vm.createContext({shieldDirect,S,Math,BACK:-8,statusScale:1,ctx:{norender:true},ballHas:rules.rules.ballHas,ballReaction:reactionBox.react,ballDmg:rules.rules.ballDmg,BALL_TYPES:rules.rules.BALL_TYPES,scene:{remove(){}},blip(){},ring(){},burst(){},typeHitBurst(){},updHud(){},updEnemyLabel(){},updBossBar(){},killEnemy(){}});
   vm.runInContext(damageLogic+'\nglobalThis.hit=damageEnemy;',box);
   box.hit(e,1,{def:ball('wind')});assert.equal(e.z,-2.45);
   e.z=-2;box.hit(e,1,{def:ball('gravity')});assert.equal(o.x,0.6);
@@ -439,3 +439,29 @@ assert.equal(contractProgress(CONTRACTS[0],{kills:99,gemsGot:99,victory:true}).r
 for(const key of ['selectedRoute','selectedContract']) assert.ok(!saveBox.qa.validSave({...valid,[key]:'bad'}));
 assert.ok(saveBox.qa.validSave({...valid,discoveredRelics:['ward','magnet'],selectedRoute:'gilded',selectedContract:'boss'}));
 console.log('PASS: three route and four contract selections; random nonduplicate relic offers excluding held; unique discovery saves; goals reward actual counts only.');
+
+assert.equal(ENEMY_GUIDE.length,3);
+assert.deepEqual([3,5,7].map(specialEnemyAt),['shield','healer','volatile']);
+assert.equal(specialEnemyAt(1),undefined);
+for(const type of ['shield','minion']) for(const frozen of [0,1]) for(const z of [-1,1]) for(const piercing of [true,false]) {
+ const block=type==='shield'&&!frozen&&z>0&&!piercing;
+ assert.equal(shieldDirect({type,frozen,z:0},{z},1,piercing),block?0:1);
+ assert.equal(shieldDirect({type,frozen,z:0},{z},4,piercing),block?3:4);
+}
+console.log('PASS: fixed special enemy waves and shield facing/freeze/pierce direct-damage boundaries.');
+{
+ const ally={hp:4.5,maxHp:5,x:.5,z:0},far={hp:2,maxHp:5,x:3,z:0},healer={type:'healer',hp:3,maxHp:5,x:0,z:0,healTimer:0};
+ const S={enemies:[healer,ally,far],enemyHeals:0};
+ const box=vm.createContext({S,Math,regionIndex:0,ring(){},updEnemyLabel(){},updBossBar(){}});
+ vm.runInContext(between(battle,'  function updateEnemyTactic(', '  function startRegionHazard(')+'\nglobalThis.tick=updateEnemyTactic;',box);
+ box.tick(healer,.05);assert.equal(ally.hp,5);assert.equal(healer.hp,3);assert.equal(far.hp,2);assert.equal(S.enemyHeals,1);
+ for(let i=0;i<20;i++)box.tick(healer,.05);assert.equal(S.enemyHeals,1);
+}
+{
+ const S={blasts:[],heroX:0,heroZ:0,blastDodges:0,over:false};let damage=0,disposed=0;
+ const box=vm.createContext({S,Math,ctx:{norender:true},ring(){},burst(){},hurtHero(n){damage+=n},scene:{remove(){}}});
+ vm.runInContext(between(battle,'  function startDeathBlast(', '  function killEnemy(')+'\nglobalThis.qa={startDeathBlast,tickDeathBlasts};',box);
+ box.qa.startDeathBlast({x:0,z:0});box.qa.tickDeathBlasts(1);assert.equal(damage,0);box.qa.tickDeathBlasts(.6);assert.equal(damage,1);box.qa.tickDeathBlasts(2);assert.equal(damage,1);
+ box.qa.startDeathBlast({x:2,z:0});S.blasts[0].mesh={material:{dispose(){disposed++}}};box.qa.tickDeathBlasts(2);assert.equal(S.blastDodges,1);assert.equal(disposed,1);assert.equal(S.blasts.length,0);
+}
+console.log('PASS: exact healer cadence/cap/range/self exclusion and delayed death blast damage/dodge/single disposal. Modeled, not a visual test.');
