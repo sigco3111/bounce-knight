@@ -254,14 +254,15 @@ export async function startBattle(ctx) {
       }
     });
     const hp = def.hp(S.wave);
-    const e = { id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
+    const e = { originX: x, id: S.nextId++, type, def, obj: m.obj, mixer: m.mixer, x, z, hp, maxHp: hp, frozen: 0, h: m.h, mats, flash: 0, label: labels.add('hp-label', '') };
     updEnemyLabel(e);
     S.enemies.push(e); renderDirty = true; // async model completion may land while a dialog holds the view
     return e;
   }
   function updEnemyLabel(e) {
     e.label.el.classList.toggle('hidden', e.type === 'boss'); // 보스 HP는 상단 전용 바에서만 표시
-    e.label.el.innerHTML = `<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
+    const role = { minion: '', rogue: '회피 이동', mage: '지면 시전', warrior: '중장갑', boss: '' }[e.type];
+    e.label.el.innerHTML = `${role ? '<div style="font-size:8px;line-height:10px;color:#d4dcec">' + role + '</div>' : ''}<div class="num">${Math.max(0, Math.ceil(e.hp))}</div><div class="bar"><i style="width:${Math.max(0, e.hp / e.maxHp * 100)}%"></i></div>`;
   }
   function milestone(w, boss = false) { // wave-clear reward, real gold + heal, not just UI
     const bonus = 10 + w;
@@ -385,8 +386,60 @@ export async function startBattle(ctx) {
     S.gems.push({ mesh, x, z, ttl: 12 });
   }
 
+  function clearEnemyWarning(e) {
+    if (!e.warning) return;
+    scene.remove(e.warning); e.warning.material.dispose(); e.warning = null;
+  }
+  function updateEnemyTactic(e, dt) {
+    if (e.type === 'rogue') {
+      e.x = Math.max(-2.4, Math.min(2.4, e.originX + Math.sin(S.now * 2.2 + e.id) * 0.65));
+      e.obj.position.x = e.x;
+      return 1;
+    }
+    if (e.type !== 'mage' && e.type !== 'boss') return 1;
+    if (!e.intent) e.intent = { stage: 'idle', left: e.type === 'boss' ? 4 : 3.4 };
+    const a = e.intent; a.left -= dt;
+    if (a.stage === 'idle' && a.left <= 0) {
+      a.stage = 'warn'; a.left = e.type === 'boss' ? 1.4 : 1.2;
+      a.x = S.heroX; a.z = S.heroZ;
+      if (!ctx.norender) {
+        const mat = new THREE.MeshBasicMaterial({ color: e.type === 'boss' ? 0xff4d55 : 0xc38aff, transparent: true, opacity: 0.6, depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide });
+        e.warning = new THREE.Mesh(e.type === 'boss' ? chargeWarningGeo : spellWarningGeo, mat);
+        e.warning.rotation.x = -Math.PI / 2; e.warning.renderOrder = 3;
+        if (e.type === 'boss') {
+          const end = Math.min(1.4, e.z + 2.2);
+          e.warning.scale.set(1.1, Math.max(0.2, end - e.z), 1);
+          e.warning.position.set(a.x, 0.045, (end + e.z) / 2);
+        } else e.warning.position.set(a.x, 0.045, a.z);
+        scene.add(e.warning);
+      }
+      updBossBar();
+    } else if (a.stage === 'warn' && a.left <= 0) {
+      clearEnemyWarning(e);
+      if (e.type === 'mage') {
+        ring(a.x, a.z, 0xc38aff, 0.8, 0.35);
+        if (Math.hypot(S.heroX - a.x, S.heroZ - a.z) < 0.7) hurtHero(1, a.x, a.z);
+        a.stage = 'idle'; a.left = 7;
+      } else {
+        a.stage = 'charge'; a.left = 1.2; a.endZ = Math.min(1.4, e.z + 2.2);
+      }
+      updBossBar();
+    } else if (a.stage === 'charge') {
+      // Target is locked at warning time. Moving aside avoids the charge lane.
+      const dx = a.x - e.x; e.x += Math.sign(dx) * Math.min(Math.abs(dx), 3 * dt); e.obj.position.x = e.x;
+      if (e.z >= a.endZ || a.left <= 0) { a.stage = 'idle'; a.left = 8; updBossBar(); return 0; }
+      return 12;
+    }
+    if (a.stage === 'warn' && e.type === 'boss') {
+      const dx = a.x - e.x; e.x += Math.sign(dx) * Math.min(Math.abs(dx), 2.5 * dt); e.obj.position.x = e.x;
+    }
+    return a.stage === 'warn' ? 0 : 1;
+  }
+
   // ---- fx: particle bursts ----
   const partGeo = new THREE.TetrahedronGeometry(0.12);
+  const chargeWarningGeo = new THREE.PlaneGeometry(1, 1);
+  const spellWarningGeo = new THREE.RingGeometry(0.65, 0.8, 40);
   const iceGeo = new THREE.IcosahedronGeometry(0.5, 0); // 동결 감옥(공유)
   const iceMat = new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.34, depthWrite: false });
   function burst(x, z, color, n = 8, spd = 3, y = 0.35, o = {}) {
@@ -479,7 +532,7 @@ export async function startBattle(ctx) {
     el.classList.remove('hidden');
     const hp = Math.max(0, Math.ceil(boss.hp));
     boss.shownHP = hp;
-    el.querySelector('span').textContent = `미니보스 ${hp}/${boss.maxHp}`;
+    el.querySelector('span').textContent = `미니보스 ${hp}/${boss.maxHp}` + (boss.intent?.stage === 'warn' ? ' · 돌진 준비' : boss.intent?.stage === 'charge' ? ' · 돌진' : '');
     el.setAttribute('role', 'progressbar'); el.setAttribute('aria-label', '미니보스 HP');
     el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', String(boss.maxHp)); el.setAttribute('aria-valuenow', String(hp));
     document.getElementById('bt-bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
@@ -488,6 +541,7 @@ export async function startBattle(ctx) {
     scene.remove(e.obj);
     if (e.mixer) { e.mixer.stopAllAction(); e.mixer.uncacheRoot(e.obj); e.mixer = null; }
     if (e.iceBox) { scene.remove(e.iceBox); e.iceBox = null; }
+    clearEnemyWarning(e);
     for (const mat of e.mats || []) mat.dispose(); // 적별 복제 재질만 해제. 공유 모델 지오메트리/텍스처는 유지
     e.mats = [];
     labels.remove(e.label);
@@ -986,8 +1040,10 @@ export async function startBattle(ctx) {
         if (e.poison.t <= 0) e.poison = null;
       }
       if (e.frozen > 0) { e.frozen -= dt; continue; }
-      if (e.mixer) e.mixer.update(dt * (e.type === 'boss' ? 0.4 : e.def.spd * 0.65));
-      e.z += MARCH_SPEED * e.def.spd * dt;
+      const tacticSpeed = updateEnemyTactic(e, dt);
+      if (S.over) return;
+      if (e.mixer) e.mixer.update(dt * (e.type === 'boss' ? 0.4 : e.def.spd * 0.65) * tacticSpeed);
+      e.z += MARCH_SPEED * e.def.spd * dt * tacticSpeed;
       if (!e.warned && e.z > 1.2) { // attack telegraph: enemy about to breach
         e.warned = true;
         if (!ctx.norender) { const p = proj(new THREE.Vector3(e.x, e.h + 0.9, e.z)); popup(labelsC, p.x, p.y, '!', 'warn'); }
@@ -1145,4 +1201,4 @@ export async function startBattle(ctx) {
     }, 1500);
   }
   return S;
-      }
+    }
