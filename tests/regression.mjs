@@ -279,6 +279,7 @@ console.log('PASS: unreachable front-row drop enters reachable lane and awards e
 
 // Combinations consume a prior status, rather than becoming a permanent damage buff.
 const reactionBox = vm.createContext({});
+vm.runInContext(definitions + '\nglobalThis.ballHasRule=ballHas;', reactionBox);
 vm.runInContext(common.slice(common.indexOf('export function ballReaction')).replaceAll('export ', '') + '\nglobalThis.react=ballReaction;', reactionBox);
 assert.equal(reactionBox.react(ball('iron'), { frozen: 1 }).damage, 2);
 assert.equal(reactionBox.react(ball('iron', 1, true), { frozen: 1 }).damage, 4);
@@ -290,7 +291,7 @@ const damageLogic = between(battle, '  function damageEnemy(', '  function updBo
 function reactHit(type, status) {
   const e = { hp: 100, mats: [], x: 0, z: 0, h: 1, ...status };
   const S = { enemies: [e], reactions: 0, evolvedHits: 0 };
-  const box = vm.createContext({ S, Math, ctx: { norender: true }, ballReaction: reactionBox.react, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
+  const box = vm.createContext({ S, Math, ctx: { norender: true }, ballReaction: reactionBox.react, ballHas: reactionBox.ballHasRule, ballDmg: () => 1, BALL_TYPES: { iron: { color: 0 }, fire: { color: 0 } }, scene: { remove() {} }, blip() {}, typeHitBurst() {}, updHud() {}, updEnemyLabel() {}, updBossBar() {}, killEnemy() {} });
   vm.runInContext(damageLogic + '\nglobalThis.hit=damageEnemy;', box);
   const src = { def: ball(type) };
   box.hit(e, 1, src); const first = e.hp; box.hit(e, 1, src);
@@ -366,3 +367,36 @@ es = eventState(); applyEventChoice(es, eventChoices('crossroad', es, 3)[1], 3);
 es.heroHP = 5; applyEventChoice(es, eventChoices('crossroad', es, 3)[0], 3); assert.equal(es.heroHP, 5);
 es.inventory = []; assert.ok(eventChoices('crossroad', es, 3)[1].disabled);
 console.log('PASS: event previews are read-only; treasure risk, nonlethal curse, capped recovery and first-ball upgrade match outcomes.');
+
+// Three new base types retain same-pair evolution; four cross recipes consume two originals.
+const rules = vm.createContext({});
+vm.runInContext(definitions + '\nglobalThis.rules={crossFusion,ballHas,ballDmg,CROSS_FUSIONS,BASE_ELEMENTS,BALL_TYPES};', rules);
+assert.equal(rules.rules.BASE_ELEMENTS.length, 7);
+assert.equal(rules.rules.CROSS_FUSIONS.length, 4);
+for (const recipe of rules.rules.CROSS_FUSIONS) {
+  const inv = Array.from(recipe.types, t => ball(t, t === recipe.types[0] ? 2 : 1));
+  const c = rules.rules.crossFusion(inv); assert.equal(c.type, recipe.result); assert.equal(c.lv, 1);
+  for (const effect of recipe.types) assert.ok(rules.rules.ballHas({ type: c.type }, effect));
+  const ff = fixture(inv); assert.equal(ff.cards[2].dataset.kind, 'cross'); ff.cards[2].onclick();
+  assert.equal(ff.S.inventory.length, 1); assert.equal(ff.S.inventory[0].type, recipe.result); assert.ok(ff.S.inventory[0].hybrid);
+  assert.equal(ff.qa.ballDmg(ff.S.inventory[0]), 4);
+  const no = inv.map(b => ({...b,evolved:true})); assert.equal(rules.rules.crossFusion(no), null);
+  const up = fixture([{...ff.S.inventory[0]}]); assert.equal(up.cards[2].dataset.kind, 'up');
+  up.cards[2].onclick(); assert.equal(up.qa.ballDmg(up.S.inventory[0]), 6);
+}
+for (const type of ['wind','gravity','pierce']) {
+  const ff=fixture([ball(type),ball(type)]); assert.equal(ff.cards[2].dataset.kind,'fuse');ff.cards[2].onclick();
+  assert.equal(ff.S.inventory.length,1);assert.ok(ff.S.inventory[0].evolved);assert.equal(ff.qa.ballDmg(ff.S.inventory[0]),4);
+}
+console.log('PASS: new ball evolution, four unordered cross recipes, lower-level retention, consumed originals, hybrid upgrades and trait pairs.');
+{
+  const enemy = (x,z) => ({hp:100,mats:[],x,z,h:1,obj:{position:{y:0,set(){}}}});
+  const e=enemy(0,-2), o=enemy(1,-2), S={enemies:[e,o],reactions:0,evolvedHits:0};
+  const box=vm.createContext({S,Math,BACK:-8,ctx:{norender:true},ballHas:rules.rules.ballHas,ballReaction:reactionBox.react,ballDmg:rules.rules.ballDmg,BALL_TYPES:rules.rules.BALL_TYPES,scene:{remove(){}},blip(){},ring(){},burst(){},typeHitBurst(){},updHud(){},updEnemyLabel(){},updBossBar(){},killEnemy(){}});
+  vm.runInContext(damageLogic+'\nglobalThis.hit=damageEnemy;',box);
+  box.hit(e,1,{def:ball('wind')});assert.equal(e.z,-2.45);
+  e.z=-2;box.hit(e,1,{def:ball('gravity')});assert.equal(o.x,0.6);
+  box.hit(e,4,{def:{type:'frostwell',lv:1,hybrid:true}});assert.equal(e.frozen,1.5);assert.ok(o.x<0.6);
+  box.hit(e,4,{def:{type:'venomgale',lv:1,hybrid:true}});assert.ok(e.poison.t>0);assert.ok(e.z<-2);
+}
+console.log('PASS: actual hit handler moves wind victims, pulls gravity neighbors, and combines frost/gravity and poison/wind.');
