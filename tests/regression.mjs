@@ -215,13 +215,15 @@ console.log('PASS: isolated save flows preserve corrupt/current/legacy originals
 
 // Exercise removal/expiry with fake objects, never a real GPU or browser profile.
 {
-let stopped=0,uncached=0,disposed=0;const removed=[],labels=[];
-const box=vm.createContext({scene:{remove(o){removed.push(o)}},labels:{remove(o){labels.push(o)}}});
+let stopped=0,uncached=0,disposed=0,bossRefresh=0;const removed=[],labels=[];
+const box=vm.createContext({scene:{remove(o){removed.push(o)}},labels:{remove(o){labels.push(o)}},updBossBar(){bossRefresh++}});
 vm.runInContext(between(battle, '  function rmvEnemy(e) {', '  function killEnemy(')+'\nglobalThis.removeEnemy=rmvEnemy;',box);
 const obj={geometry:{dispose(){throw Error('shared geometry disposed')}}},ice={};
 const enemy={obj,iceBox:ice,label:{},mats:Array.from({length:3},()=>({dispose(){disposed++}})),mixer:{stopAllAction(){stopped++},uncacheRoot(root){assert.equal(root,obj);uncached++}}};
 box.removeEnemy(enemy);assert.equal(stopped,1);assert.equal(uncached,1);assert.equal(disposed,3);assert.deepEqual(removed,[obj,ice]);assert.deepEqual(labels,[enemy.label]);assert.equal(enemy.mixer,null);assert.equal(enemy.iceBox,null);assert.equal(enemy.mats.length,0);
 box.removeEnemy(enemy);assert.equal(stopped,1);assert.equal(disposed,3);
+assert.equal(bossRefresh,0);
+box.removeEnemy({obj:{},type:'boss',label:{},mats:[]});assert.equal(bossRefresh,1); // all boss removal paths refresh the bar
 console.log('PASS exact rmvEnemy: mixer stopped/uncached, personal materials disposed once, ice/labels removed, shared geometry untouched.');
 let deaths=0,fxCalls=0;const purged=[];
 function mesh(){return {position:{x:0,y:1,z:0},rotation:{x:0,y:0},scale:{setScalar(k){assert.ok(Number.isFinite(k));this.value=k}},material:{opacity:1,dispose(){deaths++}},geometry:{dispose(){throw Error('shared FX geometry disposed')}}}}
