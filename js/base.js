@@ -13,6 +13,13 @@ export async function startBase(ctx) {
   // ctx: { save, persist(), onSortie() }
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const scr = document.getElementById('screen-base');
+  document.getElementById('base-gold').textContent = ctx.save.gold;
+  document.getElementById('base-best').textContent = ctx.save.bestWave;
+  document.getElementById('bld-name').textContent = `성 Lv.${ctx.save.castleLv}`;
+  document.getElementById('bld-desc').textContent = BLD[0].desc(ctx.save.castleLv);
+  document.getElementById('bld-cost').textContent = '🪙 ' + cost(ctx.save.castleLv);
+  document.getElementById('bld-up').disabled = true; // 모델과 건물 선택 준비 전에는 강화 실행 불가
+
   // bind the sortie CTA before any model loads: the button is visible HTML and must never be dead on slow networks
   let selectedRegion = 0;
   const regionRow = document.getElementById('region-options');
@@ -276,4 +283,4 @@ export async function startBase(ctx) {
     if (needsRender) { renderer.render(scene, camera); needsRender = false; } // the base scene has no moving objects
     requestAnimationFrame(loop);
   })();
-    }
+                                        }
