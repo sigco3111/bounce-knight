@@ -85,7 +85,7 @@
   .ball-chip { display:inline-flex; align-items:center; gap:4px; background:#232d42; border-radius:9px; padding:4px 8px;
     font-size:11px; font-weight:700; color:#dfe6f5; }
   .hint { position:absolute; bottom:150px; left:0; right:0; text-align:center; color:#9aa7c4; font-size:12px; z-index:5; pointer-events:none;
-    text-shadow:0 1px 0 rgba(0,0,0,.7); }
+    text-shadow:0 1px 0 rgba(0,0,0,.7); white-space:pre-line; }
 
   /* ---- overlays ---- */
   .overlay { position:absolute; inset:0; background:rgba(5,7,14,.78); z-index:20; display:flex;
@@ -230,7 +230,7 @@
   </div>
   <div id="bt-bossbar" class="hidden"><span>미니보스</span><div class="track"><i id="bt-bossfill"></i></div></div>
   <div id="bt-labels"></div>
-  <div class="hint" id="bt-hint">드래그해서 조준 · 놓으면 발사</div>
+  <div class="hint" id="bt-hint">왼쪽 드래그: 이동 · 오른쪽 드래그: 조준 (자동 발사)</div>
   <div class="panel">
     <div class="lvl-row">
       <div class="lvl-badge" id="bt-lv">Lv.1</div>
