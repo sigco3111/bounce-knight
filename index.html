@@ -21,6 +21,7 @@
   #boot-splash .boot-title { font-size:26px; font-weight:800; color:#ece6f8; letter-spacing:1px; }
   #boot-splash .boot-spinner { width:30px; height:30px; border-radius:50%; border:3px solid #26314a; border-top-color:#7cc4ff; animation:bootspin .9s linear infinite; }
   @keyframes bootspin { to { transform:rotate(360deg); } }
+  @media (min-aspect-ratio:6/5) { #base-loading { left:28% !important; top:45% !important; } }
   #boot-splash #boot-step { font-size:13px; font-weight:700; }
   #base-loading { position:absolute; top:38%; left:50%; transform:translateX(-50%); z-index:6; padding:8px 14px; border-radius:10px; background:rgba(10,15,28,.82); color:#9fb4dd; font-size:12px; font-weight:700; pointer-events:none; white-space:nowrap; animation:loadpulse 1.2s ease-in-out infinite; }
 
