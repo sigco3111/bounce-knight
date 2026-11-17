@@ -141,9 +141,20 @@ export async function startBase(ctx) {
   const NAT = './models/';
   const HW = 1.9, HD = HW * 0.866, CX = HW * 0.75;
   const tiles = [[0, 0], [CX, -HD / 2], [CX, HD / 2], [0, HD], [0, -HD], [-CX, HD / 2], [-CX, -HD / 2]];
+  // 첫 방문 대기 개선: 모델 10종을 병렬로 내려받고 실제 완료 개수만 보고한다(임의 진행률 없음).
+  const MODEL_TOTAL = 10; // hex 1종 + 건물 5 + 자연 3 + 기사 1
+  let loadedCnt = 0;
+  const prog = () => { loadedCnt += 1; ctx.onProgress?.(loadedCnt, MODEL_TOTAL); };
+  // 응답 없이 멈춘 요청은 reject되지 않으므로, 60초 타임아웃으로 다시 불러오기 경로에 연결한다.
+  const withTimeout = (p, label) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('model load timeout (60s): ' + label)), 60000);
+    p.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+  });
+  ctx.onProgress?.(0, MODEL_TOTAL);
   let tileTop = 0;
-  for (const [x, z] of tiles) {
-    const t = await loadModel(HEX, { w: HW, x, z });
+  const hexes = await Promise.all(tiles.map(([x, z]) => withTimeout(loadModel(HEX, { w: HW, x, z }), HEX)));
+  prog(); // 같은 파일 복제 7개라 1종으로 센다
+  for (const t of hexes) {
     scene.add(t.obj);
     tileTop = Math.max(tileTop, new THREE.Box3().setFromObject(t.obj).max.y);
   }
@@ -155,8 +166,19 @@ export async function startBase(ctx) {
     barracks: { pos: [CX, HD / 2], model: B + 'building_barracks_blue.gltf', h: 1.05, label: '훈련소' },
   };
   const tagItems = {}, labelAnchors = {}, buildingRoots = [];
-  for (const [k, sp] of Object.entries(spots)) {
-    const m = await loadModel(sp.model, { h: sp.h, x: sp.pos[0], z: sp.pos[1], y: tileTop });
+  const spotEntries = Object.entries(spots);
+  const naturalsAndKnight = [
+    withTimeout(loadModel(NAT + 'trees_A_small.gltf', { h: 1.1, x: 0, z: -HD, y: tileTop }), 'trees_A_small'),
+    withTimeout(loadModel(NAT + 'tree_single_A.gltf', { h: 1.2, x: -1.15 * CX, z: -HD * 0.95 }), 'tree_single_A'),
+    withTimeout(loadModel(NAT + 'rock_single_B.gltf', { h: 0.5, x: 1.15 * CX, z: -HD * 0.95 }), 'rock_single_B'),
+    withTimeout(loadModel('./models/27-Knight.glb', { h: 1.05, x: 1.25, z: 2.3, ry: -0.5, poseT: 0.5 }), '27-Knight'),
+  ].map(p => p.then(m => { prog(); return m; }));
+  const [spotModels, decorationModels] = await Promise.all([
+    Promise.all(spotEntries.map(([k, sp]) =>
+      withTimeout(loadModel(sp.model, { h: sp.h, x: sp.pos[0], z: sp.pos[1], y: tileTop }), sp.model).then(m => { prog(); return [k, sp, m]; }))),
+    Promise.all(naturalsAndKnight),
+  ]);
+  for (const [k, sp, m] of spotModels) {
     scene.add(m.obj);
     if (BLD.some(b => b.key === k)) { m.obj.userData.buildingKey = k; buildingRoots.push(m.obj); }
     const name = BLD.find(b => b.key === k)?.name || sp.label;
@@ -169,10 +191,7 @@ export async function startBase(ctx) {
     labels.place(tagItems[k], Math.max(62, Math.min(W() - 62, pp.x)), pp.y);
     tagItems[k].el.dataset.key = k; tagItems[k].el.dataset.name = name;
   }
-  scene.add((await loadModel(NAT + 'trees_A_small.gltf', { h: 1.1, x: 0, z: -HD, y: tileTop })).obj);
-  scene.add((await loadModel(NAT + 'tree_single_A.gltf', { h: 1.2, x: -1.15 * CX, z: -HD * 0.95 })).obj);
-  scene.add((await loadModel(NAT + 'rock_single_B.gltf', { h: 0.5, x: 1.15 * CX, z: -HD * 0.95 })).obj);
-  scene.add((await loadModel('./models/27-Knight.glb', { h: 1.05, x: 1.25, z: 2.3, ry: -0.5, poseT: 0.5 })).obj);
+  for (const m of decorationModels) scene.add(m.obj);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 18),
     new THREE.MeshStandardMaterial({ color: 0xff6a2a, emissive: 0xff4d1f, emissiveIntensity: 2.2, roughness: 0.35 }));
   ball.position.set(0.1, 0.3, 3.1); scene.add(ball);
@@ -257,4 +276,4 @@ export async function startBase(ctx) {
     if (needsRender) { renderer.render(scene, camera); needsRender = false; } // the base scene has no moving objects
     requestAnimationFrame(loop);
   })();
-}
+    }
