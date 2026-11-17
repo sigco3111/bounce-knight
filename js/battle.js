@@ -1030,7 +1030,8 @@ export async function startBattle(ctx) {
         `<span class="ball-chip" data-count="${count}" aria-label="${ballName(b)} ${count}개"><span class="dot" style="background:${BALL_TYPES[b.type].css}"></span>${ballName(b)}${count > 1 ? ' ×' + count : ''}</span>`).join('');
     }
   }
-  document.getElementById('bt-hint').textContent = region.tip;
+  const hintEl = document.getElementById('bt-hint');
+  hintEl.textContent = '왼쪽 드래그: 이동 · 오른쪽 드래그: 조준 (자동 발사)\n' + region.tip;
 
   // ---- input: 왼쪽 절반=이동, 오른쪽 절반=조준 (멀티터치) ----
   const ray = new THREE.Raycaster();
