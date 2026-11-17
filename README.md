@@ -5,6 +5,11 @@
 기사를 움직여 조준하고, 자동 발사되는 공을 튕겨 행진하는 적을 무찌르세요.
 처치 → XP 젬 수집 → 레벨업 4장 중 하나 선택(새 속성 공 2장 / 강화 또는 융합 1장 / 패시브 1장) → 기지 건물 업그레이드로 성장.
 
+## 화면
+| 기지 (세로) | 전투 (세로) | 전투 (가로) |
+| --- | --- | --- |
+| ![기지 화면](docs/screenshots/readme-base-portrait.png) | ![전투 화면](docs/screenshots/readme-battle-portrait.png) | ![전투 가로 화면](docs/screenshots/readme-battle-landscape.png) |
+
 ## 플레이
 - 왼쪽 절반 드래그: 이동 / 오른쪽 절반 드래그: 조준 (공은 자동 발사)
 - 오른쪽 위 `Ⅱ` 버튼 또는 Esc: 일시정지. `계속하기`로 재개합니다.
