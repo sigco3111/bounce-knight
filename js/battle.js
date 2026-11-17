@@ -1047,10 +1047,39 @@ export async function startBattle(ctx) {
     let a = Math.atan2(p.x - S.heroX, S.heroZ - p.z); // 0 = 위(-z)
     return Math.max(-1.25, Math.min(1.25, a));
   }
-  const touches = { move: null, aim: null };
+  // Relative twin-stick: 각 손가락은 눌린 지점이 기준점이 되고, 드래그 방향이 이동/조준 방향이 됨.
+  // 절대 위치 추적 방식은 손가락이 가린 곳으로 영웅이 달려가고 접촉 순간 조준이 튀는 문제가 있었음.
+  const sticks = {
+    move: { id: null, sx: 0, sy: 0, dx: 0, dz: 0, mag: 0, on: false },
+    aim: { id: null, sx: 0, sy: 0, dx: 0, dz: 0, mag: 0, on: false },
+  };
+  const stickUI = {};
+  function makeStickUI(half, label, color) {
+    const root = document.createElement('div');
+    root.style.cssText = 'position:absolute;width:64px;height:64px;margin:-32px 0 0 -32px;border:2px solid ' + color + ';border-radius:50%;pointer-events:none;z-index:9;display:none;box-sizing:border-box;opacity:.85';
+    const knob = document.createElement('div');
+    knob.style.cssText = 'position:absolute;left:50%;top:50%;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:' + color;
+    const tag = document.createElement('div');
+    tag.textContent = label;
+    tag.style.cssText = 'position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:3px;color:' + color + ';font:700 11px sans-serif;text-shadow:0 1px 0 rgba(0,0,0,.7);white-space:nowrap';
+    root.appendChild(knob); root.appendChild(tag);
+    scr.appendChild(root);
+    stickUI[half] = { root, knob };
+  }
+  makeStickUI('move', '이동', '#7cc4ff');
+  makeStickUI('aim', '조준', '#f2a65e');
+  function showStick(half, cx, cy, px, py) {
+    const ui = stickUI[half], r = canvas.getBoundingClientRect();
+    ui.root.style.display = 'block';
+    ui.root.style.left = (cx - r.left) + 'px'; ui.root.style.top = (cy - r.top) + 'px';
+    const d = Math.hypot(px, py), max = 26, k = d > max ? max / d : 1;
+    ui.knob.style.transform = 'translate(' + (px * k) + 'px,' + (py * k) + 'px)';
+  }
+  function hideStick(half) { stickUI[half].root.style.display = 'none'; }
   function clearControls() {
-    const ids = [touches.move, touches.aim];
-    touches.move = null; touches.aim = null; S.moveTarget = null;
+    const ids = [sticks.move.id, sticks.aim.id];
+    for (const half of ['move', 'aim']) { const st = sticks[half]; st.id = null; st.on = false; st.dx = st.dz = 0; st.mag = 0; hideStick(half); }
+    S.moveTarget = null;
     for (const id of ids) if (id != null) {
       try { if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id); } catch (_) { /* 이미 해제된 포인터 */ }
     }
@@ -1129,19 +1158,31 @@ export async function startBattle(ctx) {
     if (S.phase !== 'play') return;
     if (!hintGone) { hintGone = true; document.getElementById('bt-hint')?.classList.add('hidden'); } // 첫 조작 후 안내 숨김: 영웅/필드를 가리지 않게
     const half = e.clientX < window.innerWidth / 2 ? 'move' : 'aim';
-    touches[half] = e.pointerId;
+    const st = sticks[half];
+    if (st.id !== null) return; // 역할당 손가락 하나: 같은 쪽에 더 눌러도 기존 손가락을 빼앗지 않음
+    st.id = e.pointerId; st.sx = e.clientX; st.sy = e.clientY; st.dx = st.dz = 0; st.mag = 0; st.on = false;
     try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* 합성 테스트에는 활성 포인터가 없을 수 있음 */ }
-    if (half === 'move') S.moveTarget = groundPoint(e);
-    else S.aimDir = aimFromPoint(groundPoint(e));
+    showStick(half, e.clientX, e.clientY, 0, 0); // 누른 자리에 역할 표시: 이동/조준이 뒤섞였는지 바로 알 수 있게
   });
   canvas.addEventListener('pointermove', e => {
     if (S.phase !== 'play') return;
-    if (e.pointerId === touches.move) S.moveTarget = groundPoint(e);
-    else if (e.pointerId === touches.aim) S.aimDir = aimFromPoint(groundPoint(e));
+    const half = e.pointerId === sticks.move.id ? 'move' : e.pointerId === sticks.aim.id ? 'aim' : null;
+    if (!half) return;
+    const st = sticks[half];
+    const px = e.clientX - st.sx, py = e.clientY - st.sy, dist = Math.hypot(px, py);
+    if (dist < 12) { st.on = false; st.mag = 0; showStick(half, st.sx, st.sy, px, py); return; } // 데드존: 손떨림·짧은 접촉에 방향이 튀지 않게
+    const a = groundPoint({ clientX: st.sx, clientY: st.sy }), b = groundPoint(e); // 화면 드래그를 지면 방향으로 환산(카메라 기준)
+    st.dx = b.x - a.x; st.dz = b.z - a.z; st.mag = Math.min(1, dist / 64); st.on = true;
+    if (half === 'aim') S.aimDir = Math.max(-1.25, Math.min(1.25, Math.atan2(st.dx, -st.dz))); // 0 = 위(-z): 드래그한 쪽으로 조준
+    showStick(half, st.sx, st.sy, px, py);
   });
   const release = e => {
-    if (e.pointerId === touches.move) { touches.move = null; S.moveTarget = null; }
-    if (e.pointerId === touches.aim) touches.aim = null;
+    for (const half of ['move', 'aim']) {
+      const st = sticks[half];
+      if (e.pointerId !== st.id) continue;
+      st.id = null; st.on = false; st.dx = st.dz = 0; st.mag = 0; hideStick(half);
+      if (half === 'move') S.moveTarget = null; // 조준은 놓아도 마지막 방향 유지
+    }
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
@@ -1167,6 +1208,11 @@ export async function startBattle(ctx) {
     tickRegionHazard(dt); if (S.over) return;
     // hero movement
     const prevHeroX = S.heroX, prevHeroZ = S.heroZ;
+    if (sticks.move.on) { // 드래그 방향으로 계속 걷기: 손가락을 가만히 두어도 마지막 드래그 방향 유지
+      const L = Math.hypot(sticks.move.dx, sticks.move.dz) || 1;
+      const reach = 1.0 + 2.2 * sticks.move.mag;
+      S.moveTarget = new THREE.Vector3(S.heroX + sticks.move.dx / L * reach, 0, S.heroZ + sticks.move.dz / L * reach);
+    }
     if (S.moveTarget) {
       const dx = S.moveTarget.x - S.heroX, dz = S.moveTarget.z - S.heroZ;
       const d = Math.hypot(dx, dz);
