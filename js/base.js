@@ -23,7 +23,11 @@ export async function startBase(ctx) {
     [...regionRow.children].forEach((b, n) => b.setAttribute('aria-pressed', String(n === i)));
     const r = REGIONS[i];
     regionDetail.textContent = `${r.boss} · 10웨이브 · ${r.hazard}`;
-    document.getElementById('base-goal').textContent = `${r.name} 10웨이브 정복${(ctx.save.clearedRegions || []).includes(r.id) ? ' · 정복 완료' : (REGIONS[i + 1] ? ' · 다음 지역 해금' : ' · 마지막 지역')}`;
+    const clearedNow = ctx.save.clearedRegions || [];
+    const allCleared = REGIONS.every(r2 => clearedNow.includes(r2.id));
+    document.getElementById('base-goal').textContent = allCleared
+      ? '세 지역 모두 정복 · 남은 도전: 유물 도감 완성과 계약 원정'
+      : `${r.name} 10웨이브 정복${clearedNow.includes(r.id) ? ' · 정복 완료' : (REGIONS[i + 1] ? ' · 다음 지역 해금' : ' · 마지막 지역')}`;
     document.getElementById('btn-sortie').textContent = `${r.name} 출격 ⚔`;
   }
   regionRow.innerHTML = '';
