@@ -78,14 +78,28 @@ const scrBattle = document.getElementById('screen-battle');
 let current = null, selectedRegion = 0;
 
 const mark = s => { const el = document.getElementById('state'); el.dataset.marks = (el.dataset.marks || '') + '|' + s; };
+// first-visit wait UX: splash lives in initial HTML so it shows before any JS downloads;
+// steps report only real milestones, never made-up percentages.
+const bootStep = t => { const s = document.getElementById('boot-step'); if (s) s.textContent = t; };
+const bootDone = () => document.getElementById('boot-splash')?.remove();
+const baseProgress = (n, total) => {
+  const el = document.getElementById('base-loading');
+  if (!el) return;
+  if (n >= total) { el.classList.add('hidden'); return; }
+  el.textContent = `기지 모델 준비 중… ${n}/${total}`;
+  el.classList.remove('hidden');
+};
 async function showBase() {
   mark('showBase');
+  bootStep('기지 화면 준비 중…');
   scrBattle.classList.add('hidden');
   scrBase.classList.remove('hidden');
-  if (current === 'base') return;
+  if (current === 'base') { bootDone(); return; }
   current = 'base';
-  try { await startBase({ save, persist, onSortie: showBattle }); }
+  bootDone(); // HTML UI는 이미 상호작용 가능. 3D 모델은 base-loading 배너로 실제 개수를 보여준다.
+  try { await startBase({ save, persist, onSortie: showBattle, onProgress: baseProgress }); }
   catch (error) { showLoadError('base', error); return; }
+  document.getElementById('base-loading')?.classList.add('hidden');
   offerLegacyImport();
   if (auto) document.getElementById('btn-sortie').click();
 }
@@ -95,6 +109,7 @@ async function showBattle(regionIndex = selectedRegion) {
   if (current === 'battle') return; // 빠른 연타/중복 호출도 한 전장만 생성
   current = 'battle'; // 첫 await 전에 잠금
   document.getElementById('btn-sortie').disabled = true;
+  bootDone(); // 전장은 bt-loading이 대기 상태를 보여준다
   scrBase.classList.add('hidden');
   scrBattle.classList.remove('hidden');
   // reset battle screen DOM (labels/hud) by reloading page state instead of cloning: simplest is location-based; here we just clear labels
@@ -125,6 +140,7 @@ async function showBattle(regionIndex = selectedRegion) {
   }); } catch (error) { showLoadError('battle', error); }
 }
 function showLoadError(screen, error) {
+  bootDone();
   const graphicsFailed = error?.code === 'GRAPHICS_INIT_FAILED';
   if (current !== screen || document.getElementById('load-error-guard')) return;
   const guard = document.createElement('div'); guard.className = 'overlay'; guard.id = 'load-error-guard';
@@ -138,6 +154,7 @@ function showLoadError(screen, error) {
 }
 function begin() { if (params.has('battle')) showBattle(); else showBase(); }
 if (sessionOnly) {
+  bootDone(); // 저장 확인 대화상자가 스플래시를 대신한다
   const guard = document.createElement('div');
   guard.className = 'overlay'; guard.id = 'save-guard';
   guard.setAttribute('role', 'dialog'); guard.setAttribute('aria-modal', 'true');
